@@ -29,14 +29,28 @@ function notifyOSC777(title: string, body: string): void {
 }
 
 function notifyOSC99(title: string, body: string): void {
-	// Kitty OSC 99: i=notification id, d=0 means not done yet, p=body for second part
-	process.stdout.write(`\x1b]99;i=1:d=0;${title}\x1b\\`);
+	// Kitty OSC 99: first payload sets the title (d=0 = more data coming),
+	// second payload sets the body (d defaults to 1 = done).
+	process.stdout.write(`\x1b]99;i=1:d=0:p=title;${title}\x1b\\`);
 	process.stdout.write(`\x1b]99;i=1:p=body;${body}\x1b\\`);
 }
 
 function notifyTmux(title: string, body: string): void {
-	// DCS passthrough: wrap OSC 9 inside tmux escape sequence
-	process.stdout.write(`\x1bPtmux;\x1b\x1b]9;${body}\x1b\\`);
+	// Detect the outer terminal to pick the best OSC protocol, then wrap in
+	// tmux DCS passthrough (\x1bPtmux;…\x1b\\).  All ESC bytes inside the
+	// passthrough must be doubled; the inner OSC must be terminated with BEL
+	// (\x07) before the DCS ST (\x1b\\).
+	if (process.env.KITTY_LISTEN_ON) {
+		// Outer terminal is Kitty — use OSC 99
+		process.stdout.write(`\x1bPtmux;\x1b\x1b]99;i=1:d=0:p=title;${title}\x1b\x1b\\\x1b\\`);
+		process.stdout.write(`\x1bPtmux;\x1b\x1b]99;i=1:p=body;${body}\x1b\x1b\\\x1b\\`);
+	} else if (process.env.GHOSTTY_RESOURCES_DIR || process.env.ITERM_SESSION_ID || process.env.WEZTERM_EXECUTABLE) {
+		// Outer terminal supports OSC 777 (Ghostty, iTerm2, WezTerm)
+		process.stdout.write(`\x1bPtmux;\x1b\x1b]777;notify;${title};${body}\x07\x1b\\`);
+	} else {
+		// Fallback: OSC 9 (body only, widely supported)
+		process.stdout.write(`\x1bPtmux;\x1b\x1b]9;${body}\x07\x1b\\`);
+	}
 }
 
 function notifyWindows(title: string, body: string): void {
