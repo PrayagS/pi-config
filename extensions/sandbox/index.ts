@@ -221,6 +221,38 @@ export default function (pi: ExtensionAPI) {
 	let sandboxEnabled = false;
 	let sandboxInitialized = false;
 
+	// Session-only path additions (not persisted to config files)
+	const sessionAllowRead: string[] = [];
+	const sessionAllowWrite: string[] = [];
+
+	/** Build the effective runtime config by merging file config + session additions */
+	function getEffectiveConfig(cwd: string): SandboxConfig {
+		const config = loadConfig(cwd);
+		if (sessionAllowRead.length > 0) {
+			config.filesystem = {
+				...config.filesystem,
+				allowRead: mergeArrays(config.filesystem?.allowRead, sessionAllowRead),
+			};
+		}
+		if (sessionAllowWrite.length > 0) {
+			config.filesystem = {
+				...config.filesystem,
+				allowWrite: mergeArrays(config.filesystem?.allowWrite, sessionAllowWrite),
+			};
+		}
+		return config;
+	}
+
+	/** Push the effective config into the running SandboxManager */
+	function syncRuntimeConfig(cwd: string): void {
+		if (!sandboxInitialized) return;
+		const config = getEffectiveConfig(cwd);
+		SandboxManager.updateConfig({
+			network: config.network,
+			filesystem: config.filesystem,
+		});
+	}
+
 	pi.registerTool({
 		...localBash,
 		label: "bash (sandboxed)",
@@ -305,16 +337,141 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("sandbox", {
-		description: "Show sandbox configuration",
-		handler: async (_args, ctx) => {
-			if (!sandboxEnabled) {
-				ctx.ui.notify("Sandbox is disabled", "info");
+		description: "Manage sandbox: /sandbox, /sandbox toggle, /sandbox add <path>, /sandbox remove <path>",
+		handler: async (args, ctx) => {
+			const parts = args.trim().split(/\s+/);
+			const subcommand = parts[0]?.toLowerCase() || "";
+
+			if (subcommand === "toggle") {
+				if (sandboxEnabled) {
+					// Disable
+					if (sandboxInitialized) {
+						try {
+							await SandboxManager.reset();
+						} catch {
+							// Ignore cleanup errors
+						}
+					}
+					sandboxEnabled = false;
+					sandboxInitialized = false;
+					ctx.ui.setStatus("sandbox", "");
+					ctx.ui.notify("Sandbox disabled", "info");
+				} else {
+					// Enable
+					const config = getEffectiveConfig(ctx.cwd);
+					const platform = process.platform;
+					if (platform !== "darwin" && platform !== "linux") {
+						ctx.ui.notify(`Sandbox not supported on ${platform}`, "warning");
+						return;
+					}
+
+					try {
+						const configExt = config as unknown as {
+							ignoreViolations?: Record<string, string[]>;
+							enableWeakerNestedSandbox?: boolean;
+						};
+
+						await SandboxManager.initialize({
+							network: config.network,
+							filesystem: config.filesystem,
+							ignoreViolations: configExt.ignoreViolations,
+							enableWeakerNestedSandbox: configExt.enableWeakerNestedSandbox,
+						});
+
+						sandboxEnabled = true;
+						sandboxInitialized = true;
+
+						const networkCount = config.network?.allowedDomains?.length ?? 0;
+						const writeCount = config.filesystem?.allowWrite?.length ?? 0;
+						ctx.ui.setStatus(
+							"sandbox",
+							ctx.ui.theme.fg("accent", `🔒 Sandbox: ${networkCount} domains, ${writeCount} write paths`),
+						);
+						ctx.ui.notify("Sandbox enabled", "info");
+					} catch (err) {
+						ctx.ui.notify(
+							`Sandbox initialization failed: ${err instanceof Error ? err.message : err}`,
+							"error",
+						);
+					}
+				}
 				return;
 			}
 
-			const config = loadConfig(ctx.cwd);
+			if (subcommand === "add") {
+				const pathArg = parts.slice(1).join(" ");
+				if (!pathArg) {
+					ctx.ui.notify("Usage: /sandbox add <path>", "warning");
+					return;
+				}
+				if (!sandboxEnabled) {
+					ctx.ui.notify("Sandbox is disabled. Enable it first with /sandbox toggle", "warning");
+					return;
+				}
+
+				const choice = await ctx.ui.select(`Grant access for "${pathArg}"`, [
+					"Allow read",
+					"Allow write",
+					"Allow read + write",
+				]);
+				if (!choice) return;
+
+				if (choice.includes("read")) {
+					if (!sessionAllowRead.includes(pathArg)) sessionAllowRead.push(pathArg);
+				}
+				if (choice.includes("write")) {
+					if (!sessionAllowWrite.includes(pathArg)) sessionAllowWrite.push(pathArg);
+				}
+
+				syncRuntimeConfig(ctx.cwd);
+
+				const granted = choice.replace("Allow ", "");
+				ctx.ui.notify(`Granted ${granted} access for "${pathArg}" (session only)`, "info");
+				return;
+			}
+
+			if (subcommand === "remove") {
+				const pathArg = parts.slice(1).join(" ");
+				if (!pathArg) {
+					ctx.ui.notify("Usage: /sandbox remove <path>", "warning");
+					return;
+				}
+				if (!sandboxEnabled) {
+					ctx.ui.notify("Sandbox is disabled", "warning");
+					return;
+				}
+
+				const readIdx = sessionAllowRead.indexOf(pathArg);
+				const writeIdx = sessionAllowWrite.indexOf(pathArg);
+
+				if (readIdx === -1 && writeIdx === -1) {
+					ctx.ui.notify(
+						`"${pathArg}" is not in session allowances. Only session-added paths can be removed.`,
+						"warning",
+					);
+					return;
+				}
+
+				const removed: string[] = [];
+				if (readIdx !== -1) {
+					sessionAllowRead.splice(readIdx, 1);
+					removed.push("read");
+				}
+				if (writeIdx !== -1) {
+					sessionAllowWrite.splice(writeIdx, 1);
+					removed.push("write");
+				}
+
+				syncRuntimeConfig(ctx.cwd);
+
+				ctx.ui.notify(`Removed ${removed.join(" + ")} access for "${pathArg}"`, "info");
+				return;
+			}
+
+			// Default: show configuration
+			const config = getEffectiveConfig(ctx.cwd);
 			const lines = [
-				"Sandbox Configuration:",
+				`Sandbox: ${sandboxEnabled ? "enabled" : "disabled"}`,
 				"",
 				"Network:",
 				`  Allowed: ${config.network?.allowedDomains?.join(", ") || "(none)"}`,
@@ -326,6 +483,8 @@ export default function (pi: ExtensionAPI) {
 				`  Allow Write: ${config.filesystem?.allowWrite?.join(", ") || "(none)"}`,
 				`  Deny Write: ${config.filesystem?.denyWrite?.join(", ") || "(none)"}`,
 				`  Allow Git Config: ${config.filesystem?.allowGitConfig ?? false}`,
+				...(sessionAllowRead.length > 0 ? [`  Session Read: ${sessionAllowRead.join(", ")}`] : []),
+				...(sessionAllowWrite.length > 0 ? [`  Session Write: ${sessionAllowWrite.join(", ")}`] : []),
 			];
 
 			ctx.ui.notify(lines.join("\n"), "info");
