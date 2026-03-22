@@ -1,0 +1,24 @@
+{
+  "name": "pi-co-authored-by",
+  "version": "0.1.1",
+  "description": "A Pi extension that automatically appends a Co-Authored-By git trailer to commit messages with the model name",
+  "author": "Bruno Garcia",
+  "license": "MIT",
+  "homepage": "https://github.com/bruno-garcia/pi-co-authored-by#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bruno-garcia/pi-co-authored-by"
+  },
+  "keywords": ["pi-package", "git", "co-authored-by", "pi-extension"],
+  "files": [
+    "index.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}
