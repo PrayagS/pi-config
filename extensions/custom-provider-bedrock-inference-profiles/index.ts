@@ -45,7 +45,7 @@ interface ProfileModel {
 const PROFILE_MODELS: ProfileModel[] = [
 	{
 		id: "anthropic.claude-opus-4-6-v1",
-		name: "Claude Opus 4.6 (Profile)",
+		name: "Claude Opus 4.6",
 		envVar: "PI_BEDROCK_OPUS_INFERENCE_PROFILE_ARN",
 		reasoning: true,
 		input: ["text", "image"],
@@ -55,7 +55,7 @@ const PROFILE_MODELS: ProfileModel[] = [
 	},
 	{
 		id: "anthropic.claude-sonnet-4-6",
-		name: "Claude Sonnet 4.6 (Profile)",
+		name: "Claude Sonnet 4.6",
 		envVar: "PI_BEDROCK_SONNET_INFERENCE_PROFILE_ARN",
 		reasoning: true,
 		input: ["text", "image"],
@@ -65,7 +65,7 @@ const PROFILE_MODELS: ProfileModel[] = [
 	},
 	{
 		id: "anthropic.claude-haiku-4-5-20251001-v1:0",
-		name: "Claude Haiku 4.5 (Profile)",
+		name: "Claude Haiku 4.5",
 		envVar: "PI_BEDROCK_HAIKU_INFERENCE_PROFILE_ARN",
 		reasoning: true,
 		input: ["text", "image"],
