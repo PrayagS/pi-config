@@ -1,7 +1,4 @@
 {
   "name": "web-search-extension",
-  "type": "module",
-  "dependencies": {
-    "kagi-ken": "github:czottmann/kagi-ken"
-  }
+  "type": "module"
 }
