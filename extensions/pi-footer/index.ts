@@ -13,8 +13,8 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { buildSessionContext } from "@mariozechner/pi-coding-agent";
 import { visibleWidth, truncateToWidth } from "@mariozechner/pi-tui";
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join, sep } from "node:path";
 import { homedir } from "node:os";
 
 // ============ Types ============
@@ -36,6 +36,65 @@ interface UsageSnapshot {
 
 const USAGE_REFRESH_INTERVAL = 5 * 60_000; // 5 minutes
 const usageCache = new Map<string, UsageSnapshot>(); // keyed by provider
+
+// ============ Path Abbreviation ============
+
+/** Abbreviate a path fish-style: shorten each intermediate component to the
+ *  minimum prefix that uniquely identifies it among its siblings. The final
+ *  component and the home prefix (~) are always kept in full. */
+function abbreviatePath(fullPath: string): string {
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  let display = fullPath;
+  if (home && display.startsWith(home)) {
+    display = "~" + display.slice(home.length);
+  }
+
+  const isAbsolute = display.startsWith("/") || display.startsWith("~");
+  const parts = display.split(sep).filter(Boolean);
+
+  // Need at least a prefix + 2 parts to abbreviate anything
+  if (parts.length <= 2) return display;
+
+  // Reconstruct the real fs path for sibling lookups
+  const realParts = fullPath.split(sep).filter(Boolean);
+
+  const abbreviated: string[] = [];
+  // Abbreviate all components except the last
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i]!;
+    // Don't shorten the ~ or empty root prefix
+    if (i === 0 && (part === "~" || part === "")) {
+      abbreviated.push(part);
+      continue;
+    }
+
+    // Build the real directory path up to this level to list siblings
+    const realDir = sep + realParts.slice(0, i).join(sep);
+    let siblings: string[] = [];
+    try {
+      siblings = readdirSync(realDir);
+    } catch {
+      // Can't read dir — keep full name
+      abbreviated.push(part);
+      continue;
+    }
+
+    // Find shortest prefix of `part` not shared by any sibling
+    let len = 1;
+    while (len < part.length) {
+      const prefix = part.slice(0, len);
+      if (!siblings.some((s) => s !== part && s.startsWith(prefix))) break;
+      len++;
+    }
+    abbreviated.push(part.slice(0, len));
+  }
+
+  // Always keep the final component in full
+  abbreviated.push(parts[parts.length - 1]!);
+
+  const joined = abbreviated.join(sep);
+  return isAbsolute && !joined.startsWith("~") ? sep + joined : joined;
+}
 
 // ============ JWT Helpers ============
 
@@ -761,12 +820,7 @@ export default function (pi: ExtensionAPI) {
         render(width: number): string[] {
           const { percentage, used: ctxUsed, total: ctxTotal } = getContextInfo(ctx);
 
-          let pwd = process.cwd();
-          const home = process.env.HOME || process.env.USERPROFILE;
-          if (home && pwd.startsWith(home)) {
-            pwd = `~${pwd.slice(home.length)}`;
-          }
-
+          const pwd = abbreviatePath(process.cwd());
           const modelName = ctx.model?.id?.split("/").pop() || "no-model";
           let modelStr = theme.fg("muted", modelName);
           if (ctx.model?.reasoning) {
