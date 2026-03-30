@@ -2,80 +2,75 @@
  * Tools Extension
  *
  * Provides a /tools command to enable/disable tools interactively.
- * Tool selection persists across session reloads and respects branch navigation.
+ * Only disabled tools are tracked — anything not listed is always enabled.
+ * State is stored globally in ~/.pi/agent/tools-disabled.json so it
+ * persists across all sessions and projects.
  *
  * Usage:
  * 1. Copy this file to ~/.pi/agent/extensions/ or your project's .pi/extensions/
  * 2. Use /tools to open the tool selector
  */
 
-import type { ExtensionAPI, ExtensionContext, ToolInfo } from "@mariozechner/pi-coding-agent";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import type { ExtensionAPI, ToolInfo } from "@mariozechner/pi-coding-agent";
 import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
 import { Container, type SettingItem, SettingsList } from "@mariozechner/pi-tui";
 
-// State persisted to session
-interface ToolsState {
-	enabledTools: string[];
+const CONFIG_DIR = join(homedir(), ".pi", "agent");
+const CONFIG_FILE = join(CONFIG_DIR, "tools-disabled.json");
+
+interface GlobalState {
+	disabledTools: string[];
+}
+
+function loadDisabledTools(): Set<string> {
+	try {
+		const raw = readFileSync(CONFIG_FILE, "utf-8");
+		const parsed = JSON.parse(raw) as GlobalState;
+		return new Set(Array.isArray(parsed.disabledTools) ? parsed.disabledTools : []);
+	} catch {
+		return new Set();
+	}
+}
+
+function saveDisabledTools(disabled: Set<string>) {
+	mkdirSync(CONFIG_DIR, { recursive: true });
+	writeFileSync(CONFIG_FILE, JSON.stringify({ disabledTools: Array.from(disabled) }, null, 2));
 }
 
 export default function toolsExtension(pi: ExtensionAPI) {
-	// Track enabled tools
-	let enabledTools: Set<string> = new Set();
+	// Only disabled tools are tracked; anything not listed is always enabled
+	let disabledTools: Set<string> = loadDisabledTools();
 	let allTools: ToolInfo[] = [];
 
-	// Persist current state
-	function persistState() {
-		pi.appendEntry<ToolsState>("tools-config", {
-			enabledTools: Array.from(enabledTools),
-		});
-	}
-
-	// Apply current tool selection
+	// Apply current tool selection: enable everything except disabled tools
 	function applyTools() {
-		pi.setActiveTools(Array.from(enabledTools));
+		const active = allTools.filter((t) => !disabledTools.has(t.name)).map((t) => t.name);
+		pi.setActiveTools(active);
 	}
 
-	// Find the last tools-config entry in the current branch
-	function restoreFromBranch(ctx: ExtensionContext) {
+	function refreshAndApply() {
 		allTools = pi.getAllTools();
-
-		// Get entries in current branch only
-		const branchEntries = ctx.sessionManager.getBranch();
-		let savedTools: string[] | undefined;
-
-		for (const entry of branchEntries) {
-			if (entry.type === "custom" && entry.customType === "tools-config") {
-				const data = entry.data as ToolsState | undefined;
-				if (data?.enabledTools) {
-					savedTools = data.enabledTools;
-				}
-			}
-		}
-
-		if (savedTools) {
-			// Restore saved tool selection (filter to only tools that still exist)
-			const allToolNames = allTools.map((t) => t.name);
-			enabledTools = new Set(savedTools.filter((t: string) => allToolNames.includes(t)));
-			applyTools();
-		} else {
-			// No saved state - sync with currently active tools
-			enabledTools = new Set(pi.getActiveTools());
-		}
+		disabledTools = loadDisabledTools();
+		applyTools();
 	}
 
 	// Register /tools command
 	pi.registerCommand("tools", {
 		description: "Enable/disable tools",
 		handler: async (_args, ctx) => {
-			// Refresh tool list
+			// Refresh tool list and global state
 			allTools = pi.getAllTools();
+			disabledTools = loadDisabledTools();
 
 			await ctx.ui.custom((tui, theme, _kb, done) => {
 				// Build settings items for each tool
 				const items: SettingItem[] = allTools.map((tool) => ({
 					id: tool.name,
 					label: tool.name,
-					currentValue: enabledTools.has(tool.name) ? "enabled" : "disabled",
+					currentValue: disabledTools.has(tool.name) ? "disabled" : "enabled",
 					values: ["enabled", "disabled"],
 				}));
 
@@ -94,14 +89,14 @@ export default function toolsExtension(pi: ExtensionAPI) {
 					Math.min(items.length + 2, 15),
 					getSettingsListTheme(),
 					(id, newValue) => {
-						// Update enabled state and apply immediately
-						if (newValue === "enabled") {
-							enabledTools.add(id);
+						// Update disabled set, persist globally, and apply immediately
+						if (newValue === "disabled") {
+							disabledTools.add(id);
 						} else {
-							enabledTools.delete(id);
+							disabledTools.delete(id);
 						}
+						saveDisabledTools(disabledTools);
 						applyTools();
-						persistState();
 					},
 					() => {
 						// Close dialog
@@ -129,18 +124,8 @@ export default function toolsExtension(pi: ExtensionAPI) {
 		},
 	});
 
-	// Restore state on session start
-	pi.on("session_start", async (_event, ctx) => {
-		restoreFromBranch(ctx);
-	});
-
-	// Restore state when navigating the session tree
-	pi.on("session_tree", async (_event, ctx) => {
-		restoreFromBranch(ctx);
-	});
-
-	// Restore state after forking
-	pi.on("session_fork", async (_event, ctx) => {
-		restoreFromBranch(ctx);
-	});
+	// Apply global state on session start and navigation
+	pi.on("session_start", async () => refreshAndApply());
+	pi.on("session_tree", async () => refreshAndApply());
+	pi.on("session_fork", async () => refreshAndApply());
 }
