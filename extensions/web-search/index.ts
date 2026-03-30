@@ -104,30 +104,8 @@ export default function webSearchExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "web_search",
 		label: "Web Search",
-		description: [
-			"Search the web using Kagi.",
-			"Accepts one or more queries and runs them in parallel.",
-			"Results are numbered continuously across all queries.",
-			"Use this when you need current information, facts from the internet, or documentation.",
-		].join(" "),
-		promptSnippet: "Search the web via Kagi for current information",
-		promptGuidelines: [
-			"Include essential context within each query so each one is self-contained.",
-			"Kagi supports search operators you can embed directly in any query:",
-			'  - site:example.com    — restrict to a specific site, e.g. "best router site:reddit.com"',
-			'  - filetype:pdf        — filter by file type, e.g. "annual report filetype:pdf"',
-			"  - inurl:forum         — URL must contain the term",
-			"  - intitle:guide       — page title must contain the term",
-			'  - "exact phrase"      — match the exact phrase',
-			'  - -term               — exclude a term, e.g. "jaguar speed -car"',
-			'  - term1 OR term2      — either term, e.g. "recipes (szechuan OR cantonese)"',
-			"  - term1 AND term2     — both terms",
-			'  - *                   — wildcard, e.g. "best * ever"',
-			"Use the verbatim parameter when you need results containing the query string exactly as typed.",
-			"Use region to restrict results geographically (e.g. 'us', 'gb', 'jp').",
-			"Use time or fromDate/toDate to restrict results by recency.",
-			"Use order: 'recency' to sort by most recent first.",
-		],
+		description:
+			"Search the web using Kagi. Accepts one or more queries and runs them in parallel. Results are numbered continuously across all queries. Use this when you need current information, facts from the internet, or documentation. Include essential context within each query so each one is self-contained. Kagi supports search operators embedded directly in the query string: site:example.com (restrict to a site), filetype:pdf (filter by file type), inurl:term (URL must contain term), intitle:term (title must contain term), \"exact phrase\" (exact match), -term (exclude), OR / AND (boolean), * (wildcard).",
 		parameters: Type.Object({
 			queries: Type.Array(
 				Type.String({
