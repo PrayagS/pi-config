@@ -3,13 +3,16 @@
  * Run: npx tsx test.ts [model-id] [--thinking]
  *
  * Requires at least one ARN env var to be set:
- *   PI_BEDROCK_OPUS_INFERENCE_PROFILE_ARN,
+ *   PI_BEDROCK_OPUS_4_5_INFERENCE_PROFILE_ARN,
+ *   PI_BEDROCK_OPUS_4_6_INFERENCE_PROFILE_ARN,
+ *   PI_BEDROCK_OPUS_4_7_INFERENCE_PROFILE_ARN,
  *   PI_BEDROCK_SONNET_INFERENCE_PROFILE_ARN, or
  *   PI_BEDROCK_HAIKU_INFERENCE_PROFILE_ARN
  *
  * Examples:
  *   PI_BEDROCK_SONNET_INFERENCE_PROFILE_ARN="arn:aws:bedrock:..." npx tsx test.ts
- *   PI_BEDROCK_OPUS_INFERENCE_PROFILE_ARN="arn:aws:bedrock:..." npx tsx test.ts anthropic.claude-opus-4-6-v1 --thinking
+ *   PI_BEDROCK_OPUS_4_7_INFERENCE_PROFILE_ARN="arn:aws:bedrock:..." npx tsx test.ts anthropic.claude-opus-4-7 --thinking
+ *   PI_BEDROCK_OPUS_4_5_INFERENCE_PROFILE_ARN="arn:aws:bedrock:..." npx tsx test.ts anthropic.claude-opus-4-5-20251101-v1:0 --thinking
  */
 
 import { type Api, type Context, type Model, registerApiProvider, streamSimple } from "@mariozechner/pi-ai";
@@ -17,9 +20,29 @@ import { streamBedrockProfile } from "./index.js";
 
 const ALL_MODELS = [
 	{
+		id: "anthropic.claude-opus-4-5-20251101-v1:0",
+		name: "Claude Opus 4.5 (Profile)",
+		envVar: "PI_BEDROCK_OPUS_4_5_INFERENCE_PROFILE_ARN",
+		reasoning: true,
+		input: ["text", "image"] as ("text" | "image")[],
+		cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+		contextWindow: 200000,
+		maxTokens: 128000,
+	},
+	{
 		id: "anthropic.claude-opus-4-6-v1",
 		name: "Claude Opus 4.6 (Profile)",
-		envVar: "PI_BEDROCK_OPUS_INFERENCE_PROFILE_ARN",
+		envVar: "PI_BEDROCK_OPUS_4_6_INFERENCE_PROFILE_ARN",
+		reasoning: true,
+		input: ["text", "image"] as ("text" | "image")[],
+		cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+		contextWindow: 200000,
+		maxTokens: 128000,
+	},
+	{
+		id: "anthropic.claude-opus-4-7",
+		name: "Claude Opus 4.7 (Profile)",
+		envVar: "PI_BEDROCK_OPUS_4_7_INFERENCE_PROFILE_ARN",
 		reasoning: true,
 		input: ["text", "image"] as ("text" | "image")[],
 		cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },

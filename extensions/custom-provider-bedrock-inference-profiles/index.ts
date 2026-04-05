@@ -7,9 +7,14 @@
  * swapping the modelId to the actual ARN via onPayload right before the API call.
  *
  * Set one or more env vars to register models:
- *   PI_BEDROCK_OPUS_INFERENCE_PROFILE_ARN=arn:aws:bedrock:region:account:application-inference-profile/<uuid>
+ *   PI_BEDROCK_OPUS_4_5_INFERENCE_PROFILE_ARN=arn:aws:bedrock:region:account:application-inference-profile/<uuid>
+ *   PI_BEDROCK_OPUS_4_6_INFERENCE_PROFILE_ARN=arn:aws:bedrock:region:account:application-inference-profile/<uuid>
+ *   PI_BEDROCK_OPUS_4_7_INFERENCE_PROFILE_ARN=arn:aws:bedrock:region:account:application-inference-profile/<uuid>
  *   PI_BEDROCK_SONNET_INFERENCE_PROFILE_ARN=arn:aws:bedrock:region:account:application-inference-profile/<uuid>
  *   PI_BEDROCK_HAIKU_INFERENCE_PROFILE_ARN=arn:aws:bedrock:region:account:application-inference-profile/<uuid>
+ *
+ * Optional env vars:
+ *   PI_BEDROCK_DISABLE_ADAPTIVE_THINKING=1  // forces fixed-budget thinking for models with adaptive thinking support
  *
  * Usage:
  *   pi -e ./packages/coding-agent/examples/extensions/custom-provider-bedrock-inference-profiles
@@ -44,9 +49,29 @@ interface ProfileModel {
 
 const PROFILE_MODELS: ProfileModel[] = [
 	{
+		id: "anthropic.claude-opus-4-5-20251101-v1:0",
+		name: "Claude Opus 4.5",
+		envVar: "PI_BEDROCK_OPUS_4_5_INFERENCE_PROFILE_ARN",
+		reasoning: true,
+		input: ["text", "image"],
+		cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+		contextWindow: 200000,
+		maxTokens: 128000,
+	},
+	{
 		id: "anthropic.claude-opus-4-6-v1",
 		name: "Claude Opus 4.6",
-		envVar: "PI_BEDROCK_OPUS_INFERENCE_PROFILE_ARN",
+		envVar: "PI_BEDROCK_OPUS_4_6_INFERENCE_PROFILE_ARN",
+		reasoning: true,
+		input: ["text", "image"],
+		cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+		contextWindow: 1000000,
+		maxTokens: 128000,
+	},
+	{
+		id: "anthropic.claude-opus-4-7",
+		name: "Claude Opus 4.7",
+		envVar: "PI_BEDROCK_OPUS_4_7_INFERENCE_PROFILE_ARN",
 		reasoning: true,
 		input: ["text", "image"],
 		cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
@@ -79,6 +104,8 @@ const PROFILE_MODELS: ProfileModel[] = [
 const MODEL_ENV_MAP = new Map(PROFILE_MODELS.map((m) => [m.id, m.envVar]));
 
 const DEBUG = process.env.PI_BEDROCK_INFERENCE_PROFILES_DEBUG === "1";
+const DISABLE_ADAPTIVE_THINKING = process.env.PI_BEDROCK_DISABLE_ADAPTIVE_THINKING === "1";
+const HIGH_THINKING_BUDGET_TOKENS = 16384;
 const TAG = "[bedrock-inference-profiles]";
 
 // =============================================================================
@@ -93,6 +120,8 @@ function checksAdaptiveThinking(modelId: string): boolean {
 	return (
 		modelId.includes("opus-4-6") ||
 		modelId.includes("opus-4.6") ||
+		modelId.includes("opus-4-7") ||
+		modelId.includes("opus-4.7") ||
 		modelId.includes("sonnet-4-6") ||
 		modelId.includes("sonnet-4.6")
 	);
@@ -115,6 +144,32 @@ function checksThinkingSignature(modelId: string): boolean {
 function checksInterleavedThinking(modelId: string): boolean {
 	// Interleaved thinking is enabled when Claude is detected but adaptive thinking is NOT supported
 	return isClaudeModel(modelId) && !checksAdaptiveThinking(modelId);
+}
+
+function isOpus47(modelId: string): boolean {
+	return modelId.includes("opus-4-7") || modelId.includes("opus-4.7");
+}
+
+function needsInterleavedThinkingBetaHeader(modelId: string): boolean {
+	return modelId.includes("opus-4-5") || modelId.includes("opus-4.5");
+}
+
+function toAnthropicBetaList(existing: unknown): string[] {
+	return Array.isArray(existing)
+		? existing.filter((v): v is string => typeof v === "string")
+		: typeof existing === "string"
+			? [existing]
+			: [];
+}
+
+function mergeAnthropicBeta(existing: unknown, beta: string): string[] {
+	const values = toAnthropicBetaList(existing);
+	return values.includes(beta) ? values : [...values, beta];
+}
+
+function removeAnthropicBetas(existing: unknown, betasToRemove: string[]): string[] | undefined {
+	const values = toAnthropicBetaList(existing).filter((beta) => !betasToRemove.includes(beta));
+	return values.length > 0 ? values : undefined;
 }
 
 function logCapabilityChecks(model: ProfileModel): void {
@@ -160,6 +215,75 @@ export function streamBedrockProfile(
 				...options,
 				onPayload: (commandInput: unknown) => {
 					const payload = commandInput as Record<string, unknown>;
+					const additional =
+						(payload.additionalModelRequestFields as Record<string, unknown> | undefined) ?? {};
+
+					if (isOpus47(model.id)) {
+						delete payload.temperature;
+						delete payload.top_p;
+						delete payload.topP;
+						delete payload.top_k;
+						delete payload.topK;
+						const anthropicBeta = removeAnthropicBetas(additional.anthropic_beta, [
+							"interleaved-thinking-2025-05-14",
+							"effort-2025-11-24",
+							"fine-grained-tool-streaming-2025-05-14",
+						]);
+						payload.additionalModelRequestFields = {
+							...additional,
+							...(anthropicBeta ? { anthropic_beta: anthropicBeta } : {}),
+						};
+						if (!anthropicBeta) {
+							delete (payload.additionalModelRequestFields as Record<string, unknown>).anthropic_beta;
+						}
+					}
+
+					if (options?.reasoning && isClaudeModel(model.id)) {
+						const nextAdditional =
+							(payload.additionalModelRequestFields as Record<string, unknown> | undefined) ?? {};
+
+						if ((!DISABLE_ADAPTIVE_THINKING && checksAdaptiveThinking(model.id)) || isOpus47(model.id)) {
+							const effort = isOpus47(model.id)
+								? "xhigh"
+								: model.id.includes("opus-4-6") || model.id.includes("opus-4.6")
+									? "high"
+									: model.id.includes("sonnet-4-6") || model.id.includes("sonnet-4.6")
+										? "high"
+										: undefined;
+							payload.additionalModelRequestFields = {
+								...nextAdditional,
+								thinking: { type: "adaptive" },
+								...(effort ? { output_config: { effort } } : {}),
+							};
+						} else if (checksAdaptiveThinking(model.id)) {
+							const defaultBudgets: Record<string, number> = {
+								minimal: 1024,
+								low: 2048,
+								medium: 8192,
+								high: 16384,
+								xhigh: 16384,
+							};
+							const level = options.reasoning;
+							const normalizedLevel = level === "xhigh" ? "high" : level;
+							const customBudgets = options.thinkingBudgets as Record<string, number> | undefined;
+							const budget = customBudgets?.[normalizedLevel] ?? defaultBudgets[level] ?? defaultBudgets.high;
+							payload.additionalModelRequestFields = {
+								...nextAdditional,
+								thinking: { type: "enabled", budget_tokens: budget },
+							};
+							delete (payload.additionalModelRequestFields as Record<string, unknown>).output_config;
+						} else {
+							const anthropicBeta = needsInterleavedThinkingBetaHeader(model.id)
+								? mergeAnthropicBeta(nextAdditional.anthropic_beta, "interleaved-thinking-2025-05-14")
+								: nextAdditional.anthropic_beta;
+							payload.additionalModelRequestFields = {
+								...nextAdditional,
+								...(anthropicBeta ? { anthropic_beta: anthropicBeta } : {}),
+								thinking: { type: "enabled", budget_tokens: HIGH_THINKING_BUDGET_TOKENS },
+							};
+							delete (payload.additionalModelRequestFields as Record<string, unknown>).output_config;
+						}
+					}
 
 					if (DEBUG) {
 						const additional = payload.additionalModelRequestFields as Record<string, unknown> | undefined;
@@ -251,7 +375,7 @@ export default function (pi: ExtensionAPI) {
 
 	if (configuredModels.length === 0) {
 		console.warn(
-			"[bedrock-inference-profiles] No ARN env vars configured. Set PI_BEDROCK_OPUS_INFERENCE_PROFILE_ARN, PI_BEDROCK_SONNET_INFERENCE_PROFILE_ARN, or PI_BEDROCK_HAIKU_INFERENCE_PROFILE_ARN.",
+			"[bedrock-inference-profiles] No ARN env vars configured. Set PI_BEDROCK_OPUS_4_5_INFERENCE_PROFILE_ARN, PI_BEDROCK_OPUS_4_6_INFERENCE_PROFILE_ARN, PI_BEDROCK_OPUS_4_7_INFERENCE_PROFILE_ARN, PI_BEDROCK_SONNET_INFERENCE_PROFILE_ARN, or PI_BEDROCK_HAIKU_INFERENCE_PROFILE_ARN.",
 		);
 		return;
 	}
