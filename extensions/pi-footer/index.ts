@@ -37,11 +37,59 @@ interface UsageSnapshot {
 const USAGE_REFRESH_INTERVAL = 5 * 60_000; // 5 minutes
 const usageCache = new Map<string, UsageSnapshot>(); // keyed by provider
 
+// ============ Extension status row customization ============
+
+const STATUS_ROW_GAP_LINES = 0; // blank lines before status row
+const STATUS_ORDER: string[] = [
+  // Put extension IDs in desired order (left -> right)
+  "pi-vim",
+];
+const HIDDEN_STATUS_IDS = new Set<string>([
+  // "executor",
+]);
+const HIDDEN_STATUS_TEXT_INCLUDES = [
+  // "executor down",
+  // "proj today",
+].map((s) => s.toLowerCase());
+const SHOW_STATUS_IDS = false; // set true once to discover IDs for ordering/hiding
+
 // ============ Path Abbreviation ============
 
 /** Abbreviate a path fish-style: shorten each intermediate component to the
  *  minimum prefix that uniquely identifies it among its siblings. The final
  *  component and the home prefix (~) are always kept in full. */
+function sanitizeStatusText(text: string): string {
+  return text
+    .replace(/[\r\n\t]/g, " ")
+    .replace(/ +/g, " ")
+    .trim();
+}
+
+function formatExtensionStatuses(statuses: ReadonlyMap<string, string>): string[] {
+  const entries = Array.from(statuses.entries())
+    .map(([id, text]) => ({ id, text: sanitizeStatusText(text) }))
+    .filter(({ id, text }) => {
+      if (!text) return false;
+      if (HIDDEN_STATUS_IDS.has(id)) return false;
+      const lowered = text.toLowerCase();
+      return !HIDDEN_STATUS_TEXT_INCLUDES.some((needle) => lowered.includes(needle));
+    });
+
+  entries.sort((a, b) => {
+    const aOrder = STATUS_ORDER.indexOf(a.id);
+    const bOrder = STATUS_ORDER.indexOf(b.id);
+    const aKnown = aOrder !== -1;
+    const bKnown = bOrder !== -1;
+
+    if (aKnown && bKnown) return aOrder - bOrder;
+    if (aKnown) return -1;
+    if (bKnown) return 1;
+    return a.id.localeCompare(b.id);
+  });
+
+  return entries.map((entry) => (SHOW_STATUS_IDS ? `[${entry.id}] ${entry.text}` : entry.text));
+}
+
 function abbreviatePath(fullPath: string): string {
   const home = process.env.HOME || process.env.USERPROFILE || "";
   let display = fullPath;
@@ -803,13 +851,14 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
-    ctx.ui.setFooter((tui: any, theme: any, _footerData: any) => {
+    ctx.ui.setFooter((tui: any, theme: any, footerData: any) => {
       tuiRef = tui;
 
-      if (ctx.model?.provider) {
-        fetchUsage(ctx.model.provider);
-        startRefreshTimer();
-      }
+      // Usage display disabled
+      // if (ctx.model?.provider) {
+      //   fetchUsage(ctx.model.provider);
+      //   startRefreshTimer();
+      // }
 
       return {
         dispose: () => {
@@ -848,10 +897,22 @@ export default function (pi: ExtensionAPI) {
             lines.push(truncateToWidth(gauge, width));
           }
 
-          if (latestUsage && latestUsage.windows.length > 0) {
-            const usageLines = renderUsageLine(latestUsage, width, theme);
-            for (const line of usageLines) {
-              lines.push(truncateToWidth(line, width));
+          // Usage display disabled
+          // if (latestUsage && latestUsage.windows.length > 0) {
+          //   const usageLines = renderUsageLine(latestUsage, width, theme);
+          //   for (const line of usageLines) {
+          //     lines.push(truncateToWidth(line, width));
+          //   }
+          // }
+
+          const extensionStatuses = footerData.getExtensionStatuses() as ReadonlyMap<string, string>;
+          if (extensionStatuses.size > 0) {
+            const statusParts = formatExtensionStatuses(extensionStatuses);
+            if (statusParts.length > 0) {
+              const statusSep = " " + theme.fg("dim", ">") + " ";
+              const statusLine = statusParts.map((part) => theme.fg("dim", part)).join(statusSep);
+              for (let i = 0; i < STATUS_ROW_GAP_LINES; i++) lines.push("");
+              lines.push(truncateToWidth(statusLine, width, theme.fg("dim", "...")));
             }
           }
 
@@ -861,9 +922,10 @@ export default function (pi: ExtensionAPI) {
     });
   });
 
-  pi.on("model_select", (event, _ctx) => {
-    if (!event.model?.provider) return;
-    fetchUsage(event.model.provider);
-    startRefreshTimer();
-  });
+  // Usage display disabled
+  // pi.on("model_select", (event, _ctx) => {
+  //   if (!event.model?.provider) return;
+  //   fetchUsage(event.model.provider);
+  //   startRefreshTimer();
+  // });
 }
