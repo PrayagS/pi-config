@@ -27,8 +27,45 @@ function isJjCommitOrDescribe(cmd: string): boolean {
 	return /\bjj\s+(commit|ci|describe|desc)\b/.test(normalized) && hasMessageFlag(normalized);
 }
 
+/**
+ * Find the end position of a subcommand starting at `startPos`, stopping at
+ * the next unquoted `&&`, `||`, or `;` shell operator.
+ */
+function findSubcommandEnd(cmd: string, startPos: number): number {
+	let inSingle = false;
+	let inDouble = false;
+	for (let i = startPos; i < cmd.length; i++) {
+		const ch = cmd[i];
+		if (ch === "'" && !inDouble) inSingle = !inSingle;
+		else if (ch === '"' && !inSingle) inDouble = !inDouble;
+		else if (!inSingle && !inDouble) {
+			if ((ch === '&' && cmd[i + 1] === '&') || (ch === '|' && cmd[i + 1] === '|') || ch === ';') {
+				return i;
+			}
+		}
+	}
+	return cmd.length;
+}
+
 function appendTrailer(cmd: string, modelName: string): string {
-	return `${cmd.trimEnd()} -m "Co-Authored-By: ${modelName} <noreply@pi.dev>"`;
+	const trailer = `-m "Co-Authored-By: ${modelName} <noreply@pi.dev>"`;
+
+	// Locate the matching jj/git subcommand within a potentially compound bash command.
+	// Appending to the end of the full string breaks with `cmd1 && jj describe -m "..." && cmd2`
+	// because the trailer lands on cmd2 instead of jj describe.
+	const normalized = cmd.replace(/\\\n/g, " ");
+	const match =
+		/\bjj\s+(commit|ci|describe|desc)\b/.exec(normalized) ??
+		/\bgit\s+commit\b/.exec(normalized);
+
+	if (!match || match.index === undefined) {
+		return `${cmd.trimEnd()} ${trailer}`;
+	}
+
+	const endPos = findSubcommandEnd(cmd, match.index);
+	const before = cmd.slice(0, endPos).trimEnd();
+	const rest = cmd.slice(endPos).trimStart();
+	return rest ? `${before} ${trailer} ${rest}` : `${before} ${trailer}`;
 }
 
 export default function (pi: ExtensionAPI) {
