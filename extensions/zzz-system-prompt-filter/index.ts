@@ -143,25 +143,8 @@ export default function systemPromptFilterExtension(pi: ExtensionAPI) {
 		}
 	});
 
-	// ── Footer status ─────────────────────────────────────────────────────────
-	function updateStatus(ctx: ExtensionContext) {
-		const total = config.rules.length;
-		const active = config.rules.filter((r) => r.enabled).length;
-
-		if (total === 0) {
-			ctx.ui.setStatus("system-prompt-filter", undefined);
-		} else {
-			const label = `filters:${active}/${total}`;
-			ctx.ui.setStatus(
-				"system-prompt-filter",
-				active > 0 ? ctx.ui.theme.fg("warning", label) : ctx.ui.theme.fg("muted", label),
-			);
-		}
-	}
-
 	pi.on("session_start", async (_event, ctx) => {
 		config = loadConfig();
-		updateStatus(ctx);
 	});
 
 	pi.on("session_shutdown", (_event, ctx) => {
@@ -323,7 +306,6 @@ export default function systemPromptFilterExtension(pi: ExtensionAPI) {
 		}
 
 		saveConfig(config);
-		updateStatus(ctx);
 		ctx.ui.notify(
 			`Added ${selectedRaws.length} filter rule${selectedRaws.length === 1 ? "" : "s"}`,
 			"success",
@@ -423,7 +405,6 @@ export default function systemPromptFilterExtension(pi: ExtensionAPI) {
 
 		config.rules.push(rule);
 		saveConfig(config);
-		updateStatus(ctx);
 
 		const preview = rule.pattern.length > 50 ? rule.pattern.slice(0, 47) + "\u2026" : rule.pattern;
 		ctx.ui.notify(`Filter "${rule.name}" added  [${rule.type}: ${preview}]`, "success");
@@ -450,7 +431,6 @@ export default function systemPromptFilterExtension(pi: ExtensionAPI) {
 
 		config.rules.splice(index, 1);
 		saveConfig(config);
-		updateStatus(ctx);
 		ctx.ui.notify(`Filter "${rule.name}" removed`, "info");
 	}
 
@@ -471,7 +451,6 @@ export default function systemPromptFilterExtension(pi: ExtensionAPI) {
 		const index = items.indexOf(chosen);
 		config.rules[index].enabled = !config.rules[index].enabled;
 		saveConfig(config);
-		updateStatus(ctx);
 
 		const rule = config.rules[index];
 		ctx.ui.notify(
