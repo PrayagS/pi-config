@@ -11,7 +11,8 @@
       "./extensions"
     ],
     "skills": [
-      "./skills"
+      "./skills",
+      "./extensions/caveman/skills"
     ],
     "prompts": [
       "./prompts"
