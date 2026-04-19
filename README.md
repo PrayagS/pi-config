@@ -25,14 +25,14 @@ pi -e git:github.com/PrayagS/pi-config
 
 - `caveman/` — response-style control with `/caveman`
 - `custom-provider-bedrock-inference-profiles/` — Bedrock inference profile support
-- `fetch-url.ts` — fetch URL content as clean Markdown
-- `interactive-shell.ts` — interactive shell integration
-- `notify.ts` — notifications
+- `fetch-url/` — fetch URL content as clean Markdown
+- `interactive-shell/` — interactive shell integration
+- `notify/` — notifications
 - `pi-co-authored-by/` — append AI trailers to git/jj commits
 - `pi-footer/` — footer/status UI tweaks
-- `questionnaire.ts` — structured question UI tool
+- `questionnaire/` — structured question UI tool
 - `sandbox/` — command sandboxing
-- `tools.ts` — tooling controls
+- `tools/` — tooling controls
 - `web-search/` — web search tool
 - `zzz-system-prompt-filter/` — system prompt filtering
 
