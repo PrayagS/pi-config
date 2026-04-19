@@ -12,7 +12,6 @@
   "license": "MIT",
   "pi": {
     "extensions": [
-      "./extensions/beans-prime.ts",
       "./extensions/caveman/index.ts",
       "./extensions/custom-provider-bedrock-inference-profiles/index.ts",
       "./extensions/fetch-url.ts",
