@@ -3,25 +3,32 @@
   "network": {
     "allowLocalBinding": true,
     "allowAllUnixSockets": true,
-		"allowedDomains": [
-			"npmjs.org",
-			"*.npmjs.org",
-			"registry.npmjs.org",
-			"registry.yarnpkg.com",
-			"pypi.org",
-			"*.pypi.org",
-			"github.com",
-			"*.github.com",
-			"api.github.com",
-			"raw.githubusercontent.com"
-		],
-		"deniedDomains": []
+    "allowedDomains": [
+      "npmjs.org",
+      "*.npmjs.org",
+      "registry.npmjs.org",
+      "registry.yarnpkg.com",
+      "pypi.org",
+      "*.pypi.org",
+      "github.com",
+      "*.github.com",
+      "api.github.com",
+      "raw.githubusercontent.com"
+    ],
+    "deniedDomains": []
   },
   "filesystem": {
-    "allowRead": [".", "~/.config", "~/.cache", "~/.local", "~/.config/git/config", "~/.gitconfig"],
-		"denyRead": ["~/.ssh", "~/.aws", "~/.gnupg", "/Users"],
-		"allowWrite": [".", "/tmp"],
-		"denyWrite": [".env", ".env.*", "*.pem", "*.key"],
-		"allowGitConfig": true
+    "allowRead": [
+      ".",
+      "~/.config",
+      "~/.cache",
+      "~/.local",
+      "~/.config/git/config",
+      "~/.gitconfig"
+    ],
+    "denyRead": ["~/.ssh", "~/.aws", "~/.gnupg", "/Users"],
+    "allowWrite": [".", "/tmp"],
+    "denyWrite": [".env", ".env.*", "*.pem", "*.key"],
+    "allowGitConfig": true
   }
 }
