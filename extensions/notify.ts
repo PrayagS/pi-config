@@ -9,69 +9,83 @@
  * - Windows toast: Windows Terminal (WSL)
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
 
 function windowsToastScript(title: string, body: string): string {
-	const type = "Windows.UI.Notifications";
-	const mgr = `[${type}.ToastNotificationManager, ${type}, ContentType = WindowsRuntime]`;
-	const template = `[${type}.ToastTemplateType]::ToastText01`;
-	const toast = `[${type}.ToastNotification]::new($xml)`;
-	return [
-		`${mgr} > $null`,
-		`$xml = [${type}.ToastNotificationManager]::GetTemplateContent(${template})`,
-		`$xml.GetElementsByTagName('text')[0].AppendChild($xml.CreateTextNode('${body}')) > $null`,
-		`[${type}.ToastNotificationManager]::CreateToastNotifier('${title}').Show(${toast})`,
-	].join("; ");
+  const type = "Windows.UI.Notifications"
+  const mgr = `[${type}.ToastNotificationManager, ${type}, ContentType = WindowsRuntime]`
+  const template = `[${type}.ToastTemplateType]::ToastText01`
+  const toast = `[${type}.ToastNotification]::new($xml)`
+  return [
+    `${mgr} > $null`,
+    `$xml = [${type}.ToastNotificationManager]::GetTemplateContent(${template})`,
+    `$xml.GetElementsByTagName('text')[0].AppendChild($xml.CreateTextNode('${body}')) > $null`,
+    `[${type}.ToastNotificationManager]::CreateToastNotifier('${title}').Show(${toast})`,
+  ].join("; ")
 }
 
 function notifyOSC777(title: string, body: string): void {
-	process.stdout.write(`\x1b]777;notify;${title};${body}\x07`);
+  process.stdout.write(`\x1b]777;notify;${title};${body}\x07`)
 }
 
 function notifyOSC99(title: string, body: string): void {
-	// Kitty OSC 99: first payload sets the title (d=0 = more data coming),
-	// second payload sets the body (d defaults to 1 = done).
-	process.stdout.write(`\x1b]99;i=1:d=0:p=title;${title}\x1b\\`);
-	process.stdout.write(`\x1b]99;i=1:p=body;${body}\x1b\\`);
+  // Kitty OSC 99: first payload sets the title (d=0 = more data coming),
+  // second payload sets the body (d defaults to 1 = done).
+  process.stdout.write(`\x1b]99;i=1:d=0:p=title;${title}\x1b\\`)
+  process.stdout.write(`\x1b]99;i=1:p=body;${body}\x1b\\`)
 }
 
 function notifyTmux(title: string, body: string): void {
-	// Detect the outer terminal to pick the best OSC protocol, then wrap in
-	// tmux DCS passthrough (\x1bPtmux;…\x1b\\).  All ESC bytes inside the
-	// passthrough must be doubled; the inner OSC must be terminated with BEL
-	// (\x07) before the DCS ST (\x1b\\).
-	if (process.env.KITTY_LISTEN_ON) {
-		// Outer terminal is Kitty — use OSC 99
-		process.stdout.write(`\x1bPtmux;\x1b\x1b]99;i=1:d=0:p=title;${title}\x1b\x1b\\\x1b\\`);
-		process.stdout.write(`\x1bPtmux;\x1b\x1b]99;i=1:p=body;${body}\x1b\x1b\\\x1b\\`);
-	} else if (process.env.GHOSTTY_RESOURCES_DIR || process.env.ITERM_SESSION_ID || process.env.WEZTERM_EXECUTABLE) {
-		// Outer terminal supports OSC 777 (Ghostty, iTerm2, WezTerm)
-		process.stdout.write(`\x1bPtmux;\x1b\x1b]777;notify;${title};${body}\x07\x1b\\`);
-	} else {
-		// Fallback: OSC 9 (body only, widely supported)
-		process.stdout.write(`\x1bPtmux;\x1b\x1b]9;${body}\x07\x1b\\`);
-	}
+  // Detect the outer terminal to pick the best OSC protocol, then wrap in
+  // tmux DCS passthrough (\x1bPtmux;…\x1b\\).  All ESC bytes inside the
+  // passthrough must be doubled; the inner OSC must be terminated with BEL
+  // (\x07) before the DCS ST (\x1b\\).
+  if (process.env.KITTY_LISTEN_ON) {
+    // Outer terminal is Kitty — use OSC 99
+    process.stdout.write(
+      `\x1bPtmux;\x1b\x1b]99;i=1:d=0:p=title;${title}\x1b\x1b\\\x1b\\`
+    )
+    process.stdout.write(
+      `\x1bPtmux;\x1b\x1b]99;i=1:p=body;${body}\x1b\x1b\\\x1b\\`
+    )
+  } else if (
+    process.env.GHOSTTY_RESOURCES_DIR ||
+    process.env.ITERM_SESSION_ID ||
+    process.env.WEZTERM_EXECUTABLE
+  ) {
+    // Outer terminal supports OSC 777 (Ghostty, iTerm2, WezTerm)
+    process.stdout.write(
+      `\x1bPtmux;\x1b\x1b]777;notify;${title};${body}\x07\x1b\\`
+    )
+  } else {
+    // Fallback: OSC 9 (body only, widely supported)
+    process.stdout.write(`\x1bPtmux;\x1b\x1b]9;${body}\x07\x1b\\`)
+  }
 }
 
 function notifyWindows(title: string, body: string): void {
-	const { execFile } = require("child_process");
-	execFile("powershell.exe", ["-NoProfile", "-Command", windowsToastScript(title, body)]);
+  const { execFile } = require("child_process")
+  execFile("powershell.exe", [
+    "-NoProfile",
+    "-Command",
+    windowsToastScript(title, body),
+  ])
 }
 
 function notify(title: string, body: string): void {
-	if (process.env.WT_SESSION) {
-		notifyWindows(title, body);
-	} else if (process.env.TMUX) {
-		notifyTmux(title, body);
-	} else if (process.env.KITTY_WINDOW_ID) {
-		notifyOSC99(title, body);
-	} else {
-		notifyOSC777(title, body);
-	}
+  if (process.env.WT_SESSION) {
+    notifyWindows(title, body)
+  } else if (process.env.TMUX) {
+    notifyTmux(title, body)
+  } else if (process.env.KITTY_WINDOW_ID) {
+    notifyOSC99(title, body)
+  } else {
+    notifyOSC777(title, body)
+  }
 }
 
 export default function (pi: ExtensionAPI) {
-	pi.on("agent_end", async () => {
-		notify("Pi", "Ready for input");
-	});
+  pi.on("agent_end", async () => {
+    notify("Pi", "Ready for input")
+  })
 }
