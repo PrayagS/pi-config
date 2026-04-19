@@ -1,10 +1,29 @@
-**/node_modules
-**/package-lock.json
+# macOS
 **/.DS_Store
 **/._*
+
+# Node/npm
 node_modules/
 package-lock.json
 bun.lock
 *.tgz
+
+# Build artifacts
 dist/
 *.js.map
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# .pi folders
+**/.pi/
