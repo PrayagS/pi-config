@@ -1,8 +1,17 @@
 {
   "name": "pi-config",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "private": true,
   "description": "Personal Pi extensions and skills packaged for Pi",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PrayagS/pi-config.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PrayagS/pi-config/issues"
+  },
+  "homepage": "https://github.com/PrayagS/pi-config#readme",
   "keywords": [
     "pi-package",
     "pi-extension",
