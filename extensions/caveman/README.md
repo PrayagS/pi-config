@@ -13,7 +13,7 @@ Mode persists in session state and is shown in footer status.
 
 ## What it does
 
-- loads base caveman skill from `base-skill/SKILL.md`
+- loads base caveman system prompt from `caveman-system-prompt.md`
 - appends filtered skill text to system prompt before agent start
 - restores last selected mode on session start
 - supports `/caveman [off|lite|full|ultra]`
@@ -28,8 +28,9 @@ Default mode resolution:
 
 ## Related
 
-- base skill: `base-skill/SKILL.md`
-- bundled skill: `skills/caveman-compress/`
+- system prompt source: `caveman-system-prompt.md`
+- bundled skill: `caveman-compress/`
+- sync script: `sync-skill.sh`
 
 ## Credits
 

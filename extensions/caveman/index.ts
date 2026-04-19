@@ -13,7 +13,7 @@ const TABLE_ROW_REGEX = /^\|\s*\*\*(\S+?)\*\*\s*\|/
 const EXAMPLE_LINE_REGEX = /^- (\S+?):\s/
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const SKILL_PATH = path.resolve(__dirname, "base-skill", "SKILL.md")
+const SKILL_PATH = path.resolve(__dirname, "caveman-system-prompt.md")
 
 function getConfigDir(): string {
   if (process.env.XDG_CONFIG_HOME)
