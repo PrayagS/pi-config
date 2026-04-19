@@ -47,6 +47,9 @@
     "LICENSE",
     "package.json"
   ],
+  "scripts": {
+    "lint": "biome check .",
+    "format": "biome format --write ."
   },
   "dependencies": {
     "@mozilla/readability": "^0.5.0",
