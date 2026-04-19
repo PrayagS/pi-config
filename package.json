@@ -1,25 +1,44 @@
 {
-  "name": "my-pi-mono",
+  "name": "pi-config",
   "version": "1.0.0",
-  "private": true,
-  "description": "Personal Pi extensions, skills, prompts, and themes",
+  "description": "Personal Pi extensions and skills packaged for Pi",
+  "type": "module",
   "keywords": [
-    "pi-package"
+    "pi-package",
+    "pi-extension",
+    "pi-skill",
+    "pi-config"
   ],
+  "license": "MIT",
   "pi": {
     "extensions": [
-      "./extensions"
+      "./extensions/beans-prime.ts",
+      "./extensions/caveman/index.ts",
+      "./extensions/custom-provider-bedrock-inference-profiles/index.ts",
+      "./extensions/fetch-url.ts",
+      "./extensions/interactive-shell.ts",
+      "./extensions/notify.ts",
+      "./extensions/pi-co-authored-by/index.ts",
+      "./extensions/pi-footer/index.ts",
+      "./extensions/questionnaire.ts",
+      "./extensions/sandbox/index.ts",
+      "./extensions/tools.ts",
+      "./extensions/web-search/index.ts",
+      "./extensions/zzz-system-prompt-filter/index.ts"
     ],
     "skills": [
       "./skills",
       "./extensions/caveman/skills"
     ],
-    "prompts": [
-      "./prompts"
-    ],
-    "themes": [
-      "./themes"
-    ]
+    "themes": []
+  },
+  "files": [
+    "extensions/**",
+    "skills/**",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
   },
   "dependencies": {
     "@mozilla/readability": "^0.5.0",
