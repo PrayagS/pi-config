@@ -48,6 +48,8 @@ pi -e git:github.com/PrayagS/pi-config
 
 ## Subagent definitions
 
+These definitions are meant to be used with the [pi-interactive-subagents](https://github.com/HazAT/pi-interactive-subagents) extension.
+
 - `agents/` — subagent definitions adapted from <https://github.com/HazAT/pi-interactive-subagents/tree/main/agents>
   - `agents/spec.md`
   - `agents/planner.md`
