@@ -14,12 +14,32 @@ Purpose: keep Pi's built-in Bedrock capability checks working by registering sta
 
 Optional:
 
-- `PI_BEDROCK_DISABLE_ADAPTIVE_THINKING=1`
+- `PI_BEDROCK_AWS_PROFILE` — fallback used when `AWS_PROFILE` is unset
 - `PI_BEDROCK_INFERENCE_PROFILES_DEBUG=1`
+
+## Thinking config
+
+Use `/bedrock-inference-profile-config` to configure thinking for active Bedrock inference profile model.
+
+Config persists to `~/.pi/agent/bedrock-thinking.json`.
+
+Per-model support and defaults:
+
+- Claude Haiku 4.5 — no config, extended thinking only, default budget `63999`, default effort `high`
+- Claude Opus 4.5 — no config, extended thinking only, default budget `63999`, default effort `high`
+- Claude Opus 4.6 — adaptive toggle + effort level, defaults: adaptive `false`, budget `63999`, effort `high`
+- Claude Opus 4.7 — effort level only, always adaptive, defaults: adaptive `true`, budget `63999`, effort `high`
+- Claude Sonnet 4.6 — adaptive toggle + effort level, defaults: adaptive `false`, budget `63999`, effort `medium`
+
+NOTE: We override `max_tokens` to `64000` tokens which allows us to set the thinking budget to `63999` tokens.
+
+Extension also shows active thinking mode in footer status.
 
 ## What it handles
 
 - model registration for Claude Opus, Sonnet, Haiku variants
 - capability flags for reasoning, prompt caching, thinking signatures, interleaved thinking
+- per-model thinking config loaded from persisted agent state
+- footer status for active thinking mode
 - payload rewriting from standard Bedrock model ID to ARN
 - Bedrock beta header tweaks for specific model families
