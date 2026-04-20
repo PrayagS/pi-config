@@ -10,7 +10,7 @@
  */
 
 import { execSync } from "node:child_process"
-import { existsSync, readFileSync, readdirSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, sep } from "node:path"
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
@@ -43,6 +43,9 @@ const STATUS_ROW_GAP_LINES = 0 // blank lines before status row
 const STATUS_ORDER: string[] = [
   // Put extension IDs in desired order (left -> right)
   "pi-vim",
+  "sandbox",
+  "caveman",
+  "bedrock-thinking",
 ]
 const HIDDEN_STATUS_IDS = new Set<string>([
   // "executor",
