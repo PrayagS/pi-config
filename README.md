@@ -30,6 +30,7 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/pi-footer/` — footer/status UI tweaks
 - `extensions/questionnaire/` — structured question UI tool
 - `extensions/sandbox/` — command sandboxing
+- `extensions/supacode/` — Supacode busy state + completion notification hooks
 - `extensions/tools/` — tooling controls
 - `extensions/web-search/` — web search tool
 - `extensions/zzz-system-prompt-filter/` — system prompt filtering
