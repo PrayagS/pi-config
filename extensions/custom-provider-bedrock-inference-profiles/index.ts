@@ -13,23 +13,36 @@
  *   PI_BEDROCK_SONNET_INFERENCE_PROFILE_ARN=arn:aws:bedrock:region:account:application-inference-profile/<uuid>
  *   PI_BEDROCK_HAIKU_INFERENCE_PROFILE_ARN=arn:aws:bedrock:region:account:application-inference-profile/<uuid>
  *
- * Optional env vars:
- *   PI_BEDROCK_DISABLE_ADAPTIVE_THINKING=1  // forces fixed-budget thinking for models with adaptive thinking support
+ * Thinking configuration via /bedrock-inference-profile-config command:
+ *
+ *   Haiku 4.5: no configuration (extended thinking, 63999 tokens)
+ *   Opus 4.5: no configuration (extended thinking only, no adaptive support)
+ *   Opus 4.6 / Sonnet 4.6: adaptive toggle + effort level
+ *   Opus 4.7: effort level only (always adaptive)
+ *
+ * Config persisted to <agentDir>/bedrock-thinking.json
  *
  * Usage:
  *   pi -e ./packages/coding-agent/examples/extensions/custom-provider-bedrock-inference-profiles
  */
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import {
   type Api,
   type AssistantMessageEventStream,
   type Context,
+  createAssistantMessageEventStream,
   type Model,
   type SimpleStreamOptions,
-  createAssistantMessageEventStream,
   streamSimple,
 } from "@mariozechner/pi-ai"
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
+import {
+  getAgentDir,
+  getSettingsListTheme,
+} from "@mariozechner/pi-coding-agent"
+import { Container, type SettingItem, SettingsList } from "@mariozechner/pi-tui"
 
 // =============================================================================
 // Model Definitions
@@ -45,6 +58,50 @@ interface ProfileModel {
   cost: { input: number; output: number; cacheRead: number; cacheWrite: number }
   contextWindow: number
   maxTokens: number
+  /** Allowed effort levels for this model */
+  effortLevels: EffortLevel[]
+  /** Which config knobs are available for this model */
+  configKnobs: ("adaptive" | "effort")[]
+  /** Default thinking config for this model */
+  defaultThinking: ThinkingConfig
+}
+
+type EffortLevel = "low" | "medium" | "high" | "xhigh" | "max"
+
+interface ThinkingConfig {
+  adaptive: boolean
+  budget: number
+  effort: EffortLevel
+}
+
+const EXTENDED_THINKING_MAX_TOKENS = 64000
+
+// =============================================================================
+// Persistent Config
+// =============================================================================
+
+const CONFIG_DIR = getAgentDir()
+const CONFIG_FILE = join(CONFIG_DIR, "bedrock-thinking.json")
+
+interface PersistedConfig {
+  [modelEnvPrefix: string]: {
+    adaptive?: boolean
+    effort?: EffortLevel
+  }
+}
+
+function loadConfig(): PersistedConfig {
+  try {
+    if (existsSync(CONFIG_FILE)) {
+      return JSON.parse(readFileSync(CONFIG_FILE, "utf-8")) as PersistedConfig
+    }
+  } catch {}
+  return {}
+}
+
+function saveConfig(config: PersistedConfig): void {
+  mkdirSync(CONFIG_DIR, { recursive: true })
+  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n", "utf-8")
 }
 
 const PROFILE_MODELS: ProfileModel[] = [
@@ -57,6 +114,9 @@ const PROFILE_MODELS: ProfileModel[] = [
     cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
     contextWindow: 200000,
     maxTokens: 128000,
+    effortLevels: [],
+    configKnobs: [],
+    defaultThinking: { adaptive: false, budget: 63999, effort: "high" },
   },
   {
     id: "anthropic.claude-opus-4-6-v1",
@@ -67,6 +127,9 @@ const PROFILE_MODELS: ProfileModel[] = [
     cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
     contextWindow: 1000000,
     maxTokens: 128000,
+    effortLevels: ["low", "medium", "high", "max"],
+    configKnobs: ["adaptive", "effort"],
+    defaultThinking: { adaptive: false, budget: 63999, effort: "high" },
   },
   {
     id: "anthropic.claude-opus-4-7",
@@ -77,6 +140,9 @@ const PROFILE_MODELS: ProfileModel[] = [
     cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
     contextWindow: 1000000,
     maxTokens: 128000,
+    effortLevels: ["low", "medium", "high", "xhigh", "max"],
+    configKnobs: ["effort"],
+    defaultThinking: { adaptive: true, budget: 63999, effort: "high" },
   },
   {
     id: "anthropic.claude-sonnet-4-6",
@@ -87,6 +153,9 @@ const PROFILE_MODELS: ProfileModel[] = [
     cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
     contextWindow: 1000000,
     maxTokens: 64000,
+    effortLevels: ["low", "medium", "high", "max"],
+    configKnobs: ["adaptive", "effort"],
+    defaultThinking: { adaptive: false, budget: 63999, effort: "medium" },
   },
   {
     id: "anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -96,17 +165,48 @@ const PROFILE_MODELS: ProfileModel[] = [
     input: ["text", "image"],
     cost: { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
     contextWindow: 200000,
-    maxTokens: 8192,
+    maxTokens: 64000,
+    effortLevels: [],
+    configKnobs: [],
+    defaultThinking: { adaptive: false, budget: 63999, effort: "high" },
   },
 ]
 
 // Map from model ID to the env var that holds its ARN
 const MODEL_ENV_MAP = new Map(PROFILE_MODELS.map((m) => [m.id, m.envVar]))
 
+// Map from model ID to resolved thinking config
+const MODEL_THINKING_CONFIG = new Map<string, ThinkingConfig>()
+
+/** Resolve thinking config for a model from persisted config + defaults */
+function resolveThinkingConfig(model: ProfileModel): ThinkingConfig {
+  const config = loadConfig()
+  const persisted = config[model.id] ?? {}
+  const { configKnobs, defaultThinking } = model
+
+  const adaptive =
+    configKnobs.includes("adaptive") && persisted.adaptive !== undefined
+      ? persisted.adaptive
+      : defaultThinking.adaptive
+  const effort =
+    configKnobs.includes("effort") && persisted.effort !== undefined
+      ? persisted.effort
+      : defaultThinking.effort
+
+  return { adaptive, budget: defaultThinking.budget, effort }
+}
+
+/** Reload all thinking configs from disk */
+function reloadThinkingConfigs(): void {
+  for (const model of PROFILE_MODELS) {
+    MODEL_THINKING_CONFIG.set(model.id, resolveThinkingConfig(model))
+  }
+}
+
+// Initialize thinking configs for all models
+reloadThinkingConfigs()
+
 const DEBUG = process.env.PI_BEDROCK_INFERENCE_PROFILES_DEBUG === "1"
-const DISABLE_ADAPTIVE_THINKING =
-  process.env.PI_BEDROCK_DISABLE_ADAPTIVE_THINKING === "1"
-const HIGH_THINKING_BUDGET_TOKENS = 16384
 const TAG = "[bedrock-inference-profiles]"
 
 // =============================================================================
@@ -158,6 +258,29 @@ function needsInterleavedThinkingBetaHeader(modelId: string): boolean {
   return modelId.includes("opus-4-5") || modelId.includes("opus-4.5")
 }
 
+function setPayloadMaxTokens(
+  payload: Record<string, unknown>,
+  maxTokens: number
+): void {
+  const inferenceConfig =
+    (payload.inferenceConfig as Record<string, unknown> | undefined) ?? {}
+  payload.inferenceConfig = {
+    ...inferenceConfig,
+    maxTokens,
+  }
+}
+
+function usesFixed64kExtendedThinking(modelId: string): boolean {
+  return (
+    modelId.includes("opus-4-5") ||
+    modelId.includes("opus-4.5") ||
+    modelId.includes("opus-4-6") ||
+    modelId.includes("opus-4.6") ||
+    modelId.includes("sonnet-4-6") ||
+    modelId.includes("sonnet-4.6")
+  )
+}
+
 function toAnthropicBetaList(existing: unknown): string[] {
   return Array.isArray(existing)
     ? existing.filter((v): v is string => typeof v === "string")
@@ -183,6 +306,7 @@ function removeAnthropicBetas(
 
 function logCapabilityChecks(model: ProfileModel): void {
   const id = model.id
+  const thinkingConfig = MODEL_THINKING_CONFIG.get(id)!
   console.log(`${TAG} ${model.name} (${id})`)
   console.log(`${TAG}   Claude detected:       ${isClaudeModel(id)}`)
   console.log(`${TAG}   Adaptive thinking:      ${checksAdaptiveThinking(id)}`)
@@ -190,6 +314,9 @@ function logCapabilityChecks(model: ProfileModel): void {
   console.log(`${TAG}   Thinking signature:     ${checksThinkingSignature(id)}`)
   console.log(
     `${TAG}   Interleaved thinking:   ${checksInterleavedThinking(id)}`
+  )
+  console.log(
+    `${TAG}   Thinking config:        ${thinkingConfig.adaptive ? `adaptive (effort: ${thinkingConfig.effort})` : `extended (budget: ${thinkingConfig.budget})`}`
   )
 }
 
@@ -264,61 +391,40 @@ export function streamBedrockProfile(
                 | Record<string, unknown>
                 | undefined) ?? {}
 
-            if (
-              (!DISABLE_ADAPTIVE_THINKING &&
-                checksAdaptiveThinking(model.id)) ||
-              isOpus47(model.id)
-            ) {
-              const effort = isOpus47(model.id)
-                ? "xhigh"
-                : model.id.includes("opus-4-6") || model.id.includes("opus-4.6")
-                  ? "high"
-                  : model.id.includes("sonnet-4-6") ||
-                      model.id.includes("sonnet-4.6")
-                    ? "high"
-                    : undefined
+            const thinkingConfig = MODEL_THINKING_CONFIG.get(model.id)
+            if (!thinkingConfig) {
+              throw new Error(`No thinking config for model: ${model.id}`)
+            }
+
+            if (thinkingConfig.adaptive) {
+              // Adaptive thinking with configured effort
               payload.additionalModelRequestFields = {
                 ...nextAdditional,
                 thinking: { type: "adaptive" },
-                ...(effort ? { output_config: { effort } } : {}),
+                output_config: { effort: thinkingConfig.effort },
               }
-            } else if (checksAdaptiveThinking(model.id)) {
-              const defaultBudgets: Record<string, number> = {
-                minimal: 1024,
-                low: 2048,
-                medium: 8192,
-                high: 16384,
-                xhigh: 16384,
-              }
-              const level = options.reasoning
-              const normalizedLevel = level === "xhigh" ? "high" : level
-              const customBudgets = options.thinkingBudgets as
-                | Record<string, number>
-                | undefined
-              const budget =
-                customBudgets?.[normalizedLevel] ??
-                defaultBudgets[level] ??
-                defaultBudgets.high
-              payload.additionalModelRequestFields = {
-                ...nextAdditional,
-                thinking: { type: "enabled", budget_tokens: budget },
-              }
-              delete (
-                payload.additionalModelRequestFields as Record<string, unknown>
-              ).output_config
             } else {
+              // Extended thinking with configured budget, clamped below max_tokens
               const anthropicBeta = needsInterleavedThinkingBetaHeader(model.id)
                 ? mergeAnthropicBeta(
                     nextAdditional.anthropic_beta,
                     "interleaved-thinking-2025-05-14"
                   )
                 : nextAdditional.anthropic_beta
+              const maxTokens = usesFixed64kExtendedThinking(model.id)
+                ? EXTENDED_THINKING_MAX_TOKENS
+                : model.maxTokens
+              setPayloadMaxTokens(payload, maxTokens)
+              const budgetTokens = Math.max(
+                1,
+                Math.min(thinkingConfig.budget, maxTokens - 1)
+              )
               payload.additionalModelRequestFields = {
                 ...nextAdditional,
                 ...(anthropicBeta ? { anthropic_beta: anthropicBeta } : {}),
                 thinking: {
                   type: "enabled",
-                  budget_tokens: HIGH_THINKING_BUDGET_TOKENS,
+                  budget_tokens: budgetTokens,
                 },
               }
               delete (
@@ -472,5 +578,140 @@ export default function (pi: ExtensionAPI) {
       })
     ),
     streamSimple: streamBedrockProfile,
+  })
+
+  // =========================================================================
+  // Footer status — show thinking mode for active model
+  // =========================================================================
+
+  function updateThinkingStatus(
+    ctx: { ui: { setStatus(id: string, text: string | undefined): void } },
+    modelId: string | undefined
+  ): void {
+    const model = configuredModels.find((m) => m.id === modelId)
+    if (!model) {
+      ctx.ui.setStatus("bedrock-thinking", undefined)
+      return
+    }
+    const cfg = MODEL_THINKING_CONFIG.get(model.id)
+    if (!cfg) {
+      ctx.ui.setStatus("bedrock-thinking", undefined)
+      return
+    }
+    const label = cfg.adaptive ? `adaptive:${cfg.effort}` : "extended-thinking"
+    ctx.ui.setStatus("bedrock-thinking", label)
+  }
+
+  pi.on("model_select", async (event, ctx) => {
+    updateThinkingStatus(ctx, event.model.id)
+  })
+
+  pi.on("session_start", async (_event, ctx) => {
+    updateThinkingStatus(ctx, ctx.model?.id)
+  })
+
+  // =========================================================================
+  // /bedrock-inference-profile-config — configure active model's thinking
+  // =========================================================================
+
+  pi.registerCommand("bedrock-inference-profile-config", {
+    description: "Configure thinking for the active Bedrock model",
+    handler: async (_args, ctx) => {
+      const activeModelId = ctx.model?.id
+      const model = configuredModels.find((m) => m.id === activeModelId)
+      if (!model) {
+        const current = activeModelId ?? "none"
+        ctx.ui.notify(
+          `Active model is not a Bedrock inference profile: ${current}`,
+          "warn"
+        )
+        return
+      }
+
+      if (model.configKnobs.length === 0) {
+        ctx.ui.notify(
+          `${model.name} has no configurable thinking options`,
+          "info"
+        )
+        return
+      }
+
+      reloadThinkingConfigs()
+      const config = loadConfig()
+      const thinkingConfig = MODEL_THINKING_CONFIG.get(model.id)!
+
+      await ctx.ui.custom((tui, theme, _kb, done) => {
+        const items: SettingItem[] = []
+
+        if (model.configKnobs.includes("adaptive")) {
+          items.push({
+            id: "adaptive",
+            label: "Mode",
+            currentValue: thinkingConfig.adaptive ? "adaptive" : "extended",
+            values: ["extended", "adaptive"],
+          })
+        }
+
+        if (model.configKnobs.includes("effort")) {
+          items.push({
+            id: "effort",
+            label: "Effort",
+            currentValue: thinkingConfig.effort,
+            values: [...model.effortLevels],
+          })
+        }
+
+        const container = new Container()
+        container.addChild(
+          new (class {
+            render(_width: number) {
+              return [theme.fg("accent", theme.bold(model.name)), ""]
+            }
+            invalidate() {}
+          })()
+        )
+
+        const settingsList = new SettingsList(
+          items,
+          Math.min(items.length + 2, 8),
+          getSettingsListTheme(),
+          (id, newValue) => {
+            if (!config[model.id]) config[model.id] = {}
+
+            if (id === "adaptive") {
+              config[model.id].adaptive = newValue === "adaptive"
+            } else if (id === "effort") {
+              config[model.id].effort = newValue as EffortLevel
+            }
+
+            saveConfig(config)
+            reloadThinkingConfigs()
+          },
+          () => done()
+        )
+
+        container.addChild(settingsList)
+
+        return {
+          render(width: number) {
+            return container.render(width)
+          },
+          invalidate() {
+            container.invalidate()
+          },
+          handleInput(data: string) {
+            settingsList.handleInput?.(data)
+            tui.requestRender()
+          },
+        }
+      })
+
+      const updated = MODEL_THINKING_CONFIG.get(model.id)!
+      const summary = updated.adaptive
+        ? `adaptive (effort: ${updated.effort})`
+        : `extended (budget: ${updated.budget})`
+      ctx.ui.notify(`${model.name}: ${summary}`, "info")
+      updateThinkingStatus(ctx, model.id)
+    },
   })
 }
