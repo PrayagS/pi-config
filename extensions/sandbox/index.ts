@@ -71,6 +71,47 @@ import {
   createBashTool,
   isToolCallEventType,
 } from "@mariozechner/pi-coding-agent";
+// ── Optional PTY support (pi-bash-live-view) ─────────────────────────────────
+// Try local path first, then npm package, then disable PTY gracefully.
+let ptyAvailable = false;
+let executePtyCommand: any;
+let createPtyBashOperations: any;
+let ensureSpawnHelperExecutable: any;
+let Type: any;
+
+async function loadPtySupport() {
+  const attempts = [
+    // Local sibling checkout
+    {
+      pty: "../../../pi-extensions/pi-bash-live-view/pty-execute.ts",
+      spawn: "../../../pi-extensions/pi-bash-live-view/spawn-helper.ts",
+    },
+    // npm dependency
+    {
+      pty: "pi-bash-live-view/pty-execute.ts",
+      spawn: "pi-bash-live-view/spawn-helper.ts",
+    },
+  ];
+
+  for (const { pty, spawn } of attempts) {
+    try {
+      const [ptyMod, spawnMod, typeboxMod] = await Promise.all([
+        import(pty),
+        import(spawn),
+        import("@sinclair/typebox"),
+      ]);
+      executePtyCommand = ptyMod.executePtyCommand;
+      createPtyBashOperations = ptyMod.createPtyBashOperations;
+      ensureSpawnHelperExecutable = spawnMod.ensureSpawnHelperExecutable;
+      Type = typeboxMod.Type;
+      ptyAvailable = true;
+      return;
+    } catch {
+      continue;
+    }
+  }
+  // All sources failed — PTY disabled
+}
 
 interface SandboxConfig extends SandboxRuntimeConfig {
   enabled?: boolean;
@@ -408,9 +449,26 @@ function createSandboxedBashOps(): BashOperations {
   };
 }
 
+/**
+ * Returns BashOperations that wrap commands with sandbox, then run through PTY
+ * for live terminal rendering. Used for `user_bash` (! commands).
+ */
+function createSandboxedPtyBashOps(ctx: ExtensionContext): BashOperations {
+  const ptyOps = createPtyBashOperations(ctx);
+  return {
+    async exec(command, cwd, options) {
+      const wrappedCommand = await SandboxManager.wrapWithSandbox(command);
+      return ptyOps.exec(wrappedCommand, cwd, options);
+    },
+  };
+}
+
 // ── Extension ─────────────────────────────────────────────────────────────────
 
-export default function (pi: ExtensionAPI) {
+export default async function (pi: ExtensionAPI) {
+  await loadPtySupport();
+  if (ptyAvailable) ensureSpawnHelperExecutable();
+
   pi.registerFlag("no-sandbox", {
     description: "Disable OS-level sandboxing for bash commands",
     type: "boolean",
@@ -582,13 +640,36 @@ export default function (pi: ExtensionAPI) {
     await reinitializeSandbox(cwd);
   }
 
-  // ── Bash tool — with write-block detection and retry ───────────────────────
+  // ── Bash tool — with write-block detection, retry, and optional PTY ──────
+
+  const ptyToolProps = ptyAvailable ? {
+    parameters: Type.Object({
+      command: Type.String({ description: "Command to execute" }),
+      timeout: Type.Optional(Type.Number({ description: "Timeout in seconds" })),
+      usePTY: Type.Optional(Type.Boolean({ description: "Run inside a PTY with a live terminal widget the user can see while its running. Use this when you suspect the program being ran has interesting ansi progress output, like buildsystems." })),
+    }),
+    description: `${localBash.description} Supports optional usePTY=true live terminal rendering for terminal-style programs and richer progress UIs.`,
+  } : {};
 
   pi.registerTool({
     ...localBash,
+    ...ptyToolProps,
     label: "bash (sandboxed)",
-    async execute(id, params, signal, onUpdate, ctx) {
-      const runBash = () => {
+    async execute(id, params: { command: string; timeout?: number; usePTY?: boolean }, signal, onUpdate, ctx) {
+      // Auto-enable PTY for long-running commands
+      if (ptyAvailable && params.timeout != null && params.timeout >= 60) params.usePTY = true;
+
+      const runBash = async () => {
+        // PTY path: wrap command with sandbox if enabled, then run through PTY
+        if (ptyAvailable && params.usePTY === true) {
+          let command = params.command;
+          if (sandboxEnabled && sandboxInitialized) {
+            command = await SandboxManager.wrapWithSandbox(command);
+          }
+          return executePtyCommand(id, { command, timeout: params.timeout }, signal, ctx);
+        }
+
+        // Standard path: use sandboxed bash ops
         if (!sandboxEnabled || !sandboxInitialized) {
           return localBash.execute(id, params, signal, onUpdate);
         }
@@ -646,7 +727,11 @@ export default function (pi: ExtensionAPI) {
   // ── user_bash — network pre-check ──────────────────────────────────────────
 
   pi.on("user_bash", async (event, ctx) => {
-    if (!sandboxEnabled || !sandboxInitialized) return;
+    if (!sandboxEnabled || !sandboxInitialized) {
+      // Sandbox disabled — use PTY for live rendering if available
+      if (ptyAvailable) return { operations: createPtyBashOperations(ctx) };
+      return;
+    }
 
     const domains = extractDomainsFromCommand(event.command);
     const effectiveDomains = getEffectiveAllowedDomains(ctx.cwd);
@@ -668,7 +753,7 @@ export default function (pi: ExtensionAPI) {
       }
     }
 
-    return { operations: createSandboxedBashOps() };
+    return { operations: ptyAvailable ? createSandboxedPtyBashOps(ctx) : createSandboxedBashOps() };
   });
 
   // ── tool_call — network pre-check for bash, path policy for read/write/edit
