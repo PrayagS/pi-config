@@ -81,26 +81,34 @@ Prefer change IDs in commands — they survive rebases and squashes.
 
 3. **Verify after mutations** — run `jj st` after `squash`, `abandon`, `rebase`, or `restore` to confirm success.
 
-4. **Follow the "describe first" workflow**:
+4. **Always run `jj new` after `jj desc -m` when starting work**:
    - Check `jj st` — if `@` already has changes, run `jj new` first
-   - Describe intent with `jj desc -m "feat: add feature"` before making changes
-   - Make changes — they auto-apply to `@`
-   - Do NOT run `jj new` when finished — leave that to the next task
+   - Describe intent with `jj desc -m "feat: add feature"`
+   - Immediately run `jj new` so described commit becomes parent and new work lands in fresh working-copy commit
+   - Make changes — they auto-apply to new `@`
+   - When finishing task, leave current working-copy commit ready for next `jj desc -m` → `jj new` cycle
 
 ## Step 4: Common Operations
 
 ### Viewing State
 
+Use plain-text flags for agent-readable output. Verified from help pages:
+- `jj`: `--color=never`, `--no-pager`; for log also `--no-graph`
+- `git`: `--no-color`, `--no-pager`; for log also `--no-decorate`; for diff also `--no-ext-diff`
+
 ```bash
-jj st                       # Working copy status
-jj log                      # Commit graph (unpushed commits by default)
-jj log -r 'all()'           # All commits
-jj diff                     # Working copy diff
-jj diff --git               # Diff in git format
-jj diff --git -r <change>   # Diff of specific commit
-jj show <change>            # Full commit details
-jj evolog                   # Previous states of a change (like git reflog)
-jj op log                   # Operation history
+jj st                                       # Working copy status
+jj --color=never --no-pager log --no-graph # Plain-text log
+jj --color=never --no-pager log -r 'all()' --no-graph
+jj --color=never --no-pager diff           # Plain-text working copy diff
+jj --color=never --no-pager diff --git     # Plain-text diff in git format
+jj --color=never --no-pager diff --git -r <change>   # Diff of specific commit
+jj show <change>                            # Full commit details
+jj evolog                                   # Previous states of a change (like git reflog)
+jj op log                                   # Operation history
+
+git --no-pager log --no-color --no-decorate -n 20 --oneline
+git --no-pager diff --no-color --no-ext-diff
 ```
 
 ### Creating and Navigating Commits
