@@ -18,13 +18,16 @@
  *   /spf show     — inspect the current system prompt (headings / snippets / guidelines / write to file)
  *   /spf test     — preview the prompt after filters are applied
  *
- * Note: promptSnippet and promptGuidelines from registerTool() are not exposed by getAllTools().
- * /spf show parses them back out of the assembled system prompt text instead.
+ * Uses systemPromptOptions (from BeforeAgentStartEvent) when available for
+ * structured access to tool snippets, guidelines, skills, and context files.
+ * Falls back to regex parsing of the raw prompt text on first run before any
+ * agent start event has fired.
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import type {
+  BuildSystemPromptOptions,
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent"
@@ -136,9 +139,13 @@ function parseSection(prompt: string, heading: string): string[] {
 
 export default function systemPromptFilterExtension(pi: ExtensionAPI) {
   let config = loadConfig()
+  let cachedOptions: BuildSystemPromptOptions | undefined
 
   // ── Filter: runs last (zzz- prefix) after all other extensions ──────────
   pi.on("before_agent_start", async (event) => {
+    // Cache structured prompt options for use in /spf commands
+    cachedOptions = (event as any).systemPromptOptions
+
     const enabled = config.rules.filter((r) => r.enabled)
     if (enabled.length === 0) return
 
@@ -240,11 +247,30 @@ export default function systemPromptFilterExtension(pi: ExtensionAPI) {
     }
   }
 
+  // ── Helpers: get structured data from cache or fallback to regex ────────
+  function getToolSnippetLines(prompt: string): string[] {
+    if (cachedOptions?.toolSnippets) {
+      return Object.entries(cachedOptions.toolSnippets).map(
+        ([name, desc]) => `- ${name}: ${desc}`
+      )
+    }
+    return parseSection(prompt, "Available tools")
+  }
+
+  function getGuidelineLines(prompt: string): string[] {
+    if (cachedOptions?.promptGuidelines && cachedOptions.promptGuidelines.length > 0) {
+      return cachedOptions.promptGuidelines.map((g) =>
+        g.startsWith("-") ? g : `- ${g}`
+      )
+    }
+    return parseSection(prompt, "Guidelines")
+  }
+
   // ── Add ───────────────────────────────────────────────────────────────────
   async function handleAdd(ctx: ExtensionContext) {
     const prompt = ctx.getSystemPrompt()
-    const toolItems = parseSection(prompt, "Available tools")
-    const guideItems = parseSection(prompt, "Guidelines")
+    const toolItems = getToolSnippetLines(prompt)
+    const guideItems = getGuidelineLines(prompt)
     const hasPromptItems = toolItems.length > 0 || guideItems.length > 0
 
     const modeChoices = [
@@ -532,14 +558,20 @@ export default function systemPromptFilterExtension(pi: ExtensionAPI) {
           `  line ${String(i + 1).padStart(4, " ")} \u2502 ${line}`
       )
 
-    // Parsed back from the assembled prompt (getAllTools() doesn't expose these)
-    const toolSnippets = parseSection(prompt, "Available tools")
-    const guidelineItems = parseSection(prompt, "Guidelines")
+    const toolSnippets = getToolSnippetLines(prompt)
+    const guidelineItems = getGuidelineLines(prompt)
+    const skillCount = cachedOptions?.skills?.length ?? 0
+    const contextFileCount = cachedOptions?.contextFiles?.length ?? 0
+    const source = cachedOptions ? "structured" : "parsed"
 
     const options = [
       `headings   — list all ${headings.length} section headings`,
-      `snippets   — show promptSnippet lines from Available tools (${toolSnippets.length} found)`,
-      `guidelines — show promptGuidelines bullets from Guidelines (${guidelineItems.length} found)`,
+      `snippets   — show tool snippets (${toolSnippets.length} found, ${source})`,
+      `guidelines — show guideline bullets (${guidelineItems.length} found, ${source})`,
+      ...(cachedOptions ? [
+        `skills     — show loaded skills (${skillCount})`,
+        `context    — show loaded context files (${contextFileCount})`,
+      ] : []),
       `preview    — show first 25 lines of content`,
       `write      — write the full prompt to a file`,
     ]
@@ -565,8 +597,8 @@ export default function systemPromptFilterExtension(pi: ExtensionAPI) {
       case "snippets":
         ctx.ui.notify(
           toolSnippets.length > 0
-            ? `promptSnippet lines in Available tools (${toolSnippets.length}):\n\n${toolSnippets.join("\n")}`
-            : 'No "Available tools" section found in the current system prompt.',
+            ? `Tool snippets (${toolSnippets.length}, ${source}):\n\n${toolSnippets.join("\n")}`
+            : 'No tool snippets found.',
           "info"
         )
         break
@@ -574,11 +606,43 @@ export default function systemPromptFilterExtension(pi: ExtensionAPI) {
       case "guidelines":
         ctx.ui.notify(
           guidelineItems.length > 0
-            ? `promptGuidelines bullets in Guidelines (${guidelineItems.length}):\n\n${guidelineItems.join("\n")}`
-            : 'No "Guidelines" section found in the current system prompt.',
+            ? `Guideline bullets (${guidelineItems.length}, ${source}):\n\n${guidelineItems.join("\n")}`
+            : 'No guidelines found.',
           "info"
         )
         break
+
+      case "skills": {
+        const skills = cachedOptions?.skills ?? []
+        if (skills.length === 0) {
+          ctx.ui.notify('No skills loaded.', "info")
+        } else {
+          const skillLines = skills.map(
+            (s) => `  ${s.name} — ${s.description.slice(0, 80)}${s.description.length > 80 ? '…' : ''}`
+          )
+          ctx.ui.notify(
+            `Loaded skills (${skills.length}):\n\n${skillLines.join("\n")}`,
+            "info"
+          )
+        }
+        break
+      }
+
+      case "context": {
+        const files = cachedOptions?.contextFiles ?? []
+        if (files.length === 0) {
+          ctx.ui.notify('No context files loaded.', "info")
+        } else {
+          const fileLines = files.map(
+            (f) => `  ${f.path} (${f.content.length} chars)`
+          )
+          ctx.ui.notify(
+            `Loaded context files (${files.length}):\n\n${fileLines.join("\n")}`,
+            "info"
+          )
+        }
+        break
+      }
 
       case "preview": {
         const preview = lines.slice(0, 25).join("\n")
