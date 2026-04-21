@@ -17,6 +17,11 @@ Optional:
 - `PI_BEDROCK_AWS_PROFILE` — fallback used when `AWS_PROFILE` is unset
 - `PI_BEDROCK_INFERENCE_PROFILES_DEBUG=1`
 
+Constraints:
+
+- All configured inference profile ARNs must use same Bedrock region.
+- Runtime endpoint is derived from configured inference profile ARN region, not hardcoded.
+
 ## Thinking config
 
 Use `/bedrock-inference-profile-config` to configure thinking for active Bedrock inference profile model.
@@ -42,4 +47,5 @@ Extension also shows active thinking mode in footer status.
 - per-model thinking config loaded from persisted agent state
 - footer status for active thinking mode
 - payload rewriting from standard Bedrock model ID to ARN
+- Bedrock runtime endpoint + signing region derived from inference profile ARN region
 - Bedrock beta header tweaks for specific model families

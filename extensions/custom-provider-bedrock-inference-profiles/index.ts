@@ -74,6 +74,11 @@ interface ThinkingConfig {
   effort: EffortLevel
 }
 
+interface InferenceProfileArn {
+  partition: string
+  region: string
+}
+
 const EXTENDED_THINKING_MAX_TOKENS = 64000
 
 // =============================================================================
@@ -174,6 +179,40 @@ const PROFILE_MODELS: ProfileModel[] = [
 
 // Map from model ID to the env var that holds its ARN
 const MODEL_ENV_MAP = new Map(PROFILE_MODELS.map((m) => [m.id, m.envVar]))
+
+function parseInferenceProfileArn(arn: string): InferenceProfileArn {
+  const parts = arn.split(":", 6)
+  if (parts.length < 6 || parts[0] !== "arn" || parts[2] !== "bedrock") {
+    throw new Error(`Invalid Bedrock inference profile ARN: ${arn}`)
+  }
+
+  const partition = parts[1]
+  const region = parts[3]
+  const resource = parts[5]
+
+  if (!region || !resource.startsWith("application-inference-profile/")) {
+    throw new Error(`Invalid Bedrock inference profile ARN: ${arn}`)
+  }
+
+  return { partition, region }
+}
+
+function getBedrockDnsSuffix(partition: string): string {
+  switch (partition) {
+    case "aws":
+    case "aws-us-gov":
+      return "amazonaws.com"
+    case "aws-cn":
+      return "amazonaws.com.cn"
+    default:
+      throw new Error(`Unsupported AWS partition for Bedrock: ${partition}`)
+  }
+}
+
+function getBedrockRuntimeBaseUrl(arn: string): string {
+  const { partition, region } = parseInferenceProfileArn(arn)
+  return `https://bedrock-runtime.${region}.${getBedrockDnsSuffix(partition)}`
+}
 
 // Map from model ID to resolved thinking config
 const MODEL_THINKING_CONFIG = new Map<string, ThinkingConfig>()
@@ -343,16 +382,21 @@ export function streamBedrockProfile(
       const arn = process.env[envVar]
       if (!arn) throw new Error(`${envVar} is not set`)
 
-      // Delegate to the built-in Bedrock provider by setting the correct api
+      const { region } = parseInferenceProfileArn(arn)
+
+      // Delegate to the built-in Bedrock provider by setting correct api +
+      // endpoint for this inference profile's region.
       const delegateModel: Model<Api> = {
         ...model,
         api: "bedrock-converse-stream" as Api,
+        baseUrl: getBedrockRuntimeBaseUrl(arn),
       }
 
       // Wrap onPayload to intercept, log, and replace modelId with the actual ARN
       const originalOnPayload = options?.onPayload
-      const wrappedOptions: SimpleStreamOptions = {
+      const wrappedOptions: SimpleStreamOptions & { region: string } = {
         ...options,
+        region,
         onPayload: (commandInput: unknown) => {
           const payload = commandInput as Record<string, unknown>
           const additional =
@@ -482,7 +526,7 @@ export function streamBedrockProfile(
           }
 
           payload.modelId = arn
-          originalOnPayload?.(commandInput)
+          return originalOnPayload?.(commandInput)
         },
       }
 
@@ -551,8 +595,34 @@ export default function (pi: ExtensionAPI) {
     return
   }
 
+  let providerBaseUrl: string
+  try {
+    const configuredArns = configuredModels.map((m) => {
+      const arn = process.env[m.envVar]
+      if (!arn) {
+        throw new Error(`${m.envVar} is not set`)
+      }
+      return arn
+    })
+    const configuredRegions = new Set(
+      configuredArns.map((arn) => parseInferenceProfileArn(arn).region)
+    )
+    if (configuredRegions.size !== 1) {
+      throw new Error(
+        `Configured inference profiles span multiple regions: ${[...configuredRegions].sort().join(", ")}`
+      )
+    }
+    providerBaseUrl = getBedrockRuntimeBaseUrl(configuredArns[0])
+  } catch (error) {
+    console.warn(
+      `${TAG} ${error instanceof Error ? error.message : String(error)}`
+    )
+    return
+  }
+
   if (DEBUG) {
     console.log(`${TAG} Capability check results for synthetic model IDs:`)
+    console.log(`${TAG}   provider endpoint:      ${providerBaseUrl}`)
     for (const m of configuredModels) {
       logCapabilityChecks(m)
       console.log(`${TAG}   ARN:                    ${process.env[m.envVar]}`)
@@ -563,7 +633,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   pi.registerProvider("bedrock-inference-profiles", {
-    baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+    baseUrl: providerBaseUrl,
     apiKey: "AWS_PROFILE",
     api: "bedrock-inference-profiles-api" as Api,
     models: configuredModels.map(
