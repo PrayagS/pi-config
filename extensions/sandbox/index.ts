@@ -63,7 +63,7 @@
 import { execSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { SandboxManager, type SandboxRuntimeConfig } from "@anthropic-ai/sandbox-runtime";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import {
@@ -283,6 +283,12 @@ function addWritePathToConfig(configPath: string, pathToAdd: string): void {
 function detectRepoRoots(cwd: string): string[] {
   const roots: string[] = [];
 
+  function addRoot(root: string): void {
+    if (root && existsSync(root) && !roots.includes(root)) {
+      roots.push(root);
+    }
+  }
+
   // Try git first
   try {
     const gitRoot = execSync("git rev-parse --show-toplevel", {
@@ -290,8 +296,15 @@ function detectRepoRoots(cwd: string): string[] {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
-    if (gitRoot && existsSync(gitRoot)) {
-      roots.push(gitRoot);
+    addRoot(gitRoot);
+
+    const gitCommonDir = execSync("git rev-parse --path-format=absolute --git-common-dir", {
+      cwd,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (gitCommonDir && existsSync(gitCommonDir) && basename(gitCommonDir) === ".git") {
+      addRoot(dirname(gitCommonDir));
     }
   } catch {
     // Not a git repo or git not available
@@ -304,11 +317,20 @@ function detectRepoRoots(cwd: string): string[] {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
-    if (jjRoot && existsSync(jjRoot) && !roots.includes(jjRoot)) {
-      roots.push(jjRoot);
-    }
+    addRoot(jjRoot);
   } catch {
     // Not a jj repo or jj not available
+  }
+
+  try {
+    const jjWorkspaceRoot = execSync("jj workspace root", {
+      cwd,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    addRoot(jjWorkspaceRoot);
+  } catch {
+    // Older jj version, not a jj workspace, or jj not available
   }
 
   return roots;

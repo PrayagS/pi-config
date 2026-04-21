@@ -11,7 +11,7 @@ Uses [`@anthropic-ai/sandbox-runtime`](https://github.com/anthropics/anthropic-q
 - **Interactive prompts** — when blocked, choose to allow for session, project, or globally
 - **Config merging** — global + project configs merged, project takes precedence
 - **Session allowances** — temporary grants stored in memory (agent cannot access)
-- **Auto-detect repo roots** — git/jj repo roots auto-allowed for write access at session start
+- **Auto-detect repo roots** — git roots, git main worktree roots, jj roots, and `jj workspace root` all auto-allowed for write access at session start
 - **Domain glob patterns** — support `*.github.com` style wildcards
 - **Path glob patterns** — support `*.pem`, `.env.*` style patterns
 
