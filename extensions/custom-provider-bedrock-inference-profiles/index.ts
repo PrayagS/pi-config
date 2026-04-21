@@ -441,7 +441,9 @@ export function streamBedrockProfile(
             }
 
             if (thinkingConfig.adaptive) {
-              // Adaptive thinking with configured effort
+              // Adaptive thinking with configured effort. Keep max_tokens at 64k
+              // so thinking output has same headroom as extended-thinking mode.
+              setPayloadMaxTokens(payload, EXTENDED_THINKING_MAX_TOKENS)
               payload.additionalModelRequestFields = {
                 ...nextAdditional,
                 thinking: { type: "adaptive" },

@@ -36,7 +36,7 @@ Per-model support and defaults:
 - Claude Opus 4.7 — effort level only, always adaptive, defaults: adaptive `true`, budget `63999`, effort `high`
 - Claude Sonnet 4.6 — adaptive toggle + effort level, defaults: adaptive `false`, budget `63999`, effort `medium`
 
-NOTE: We override `max_tokens` to `64000` tokens which allows us to set the thinking budget to `63999` tokens.
+NOTE: We override `max_tokens` to `64000` tokens for all thinking modes, including adaptive thinking. This keeps thinking headroom consistent and allows extended-thinking budgets up to `63999` tokens.
 
 Extension also shows active thinking mode in footer status.
 
