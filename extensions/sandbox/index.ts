@@ -62,7 +62,7 @@
 
 import { execSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { SandboxManager, type SandboxRuntimeConfig } from "@anthropic-ai/sandbox-runtime";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
@@ -792,6 +792,15 @@ export default function (pi: ExtensionAPI) {
     }
 
     try {
+      const tempPaths = [process.env.TMPDIR, tmpdir()];
+      for (const path of tempPaths) {
+        if (!path) continue;
+        const normalizedPath = resolve(path);
+        if (!sessionAllowedWritePaths.includes(normalizedPath)) {
+          sessionAllowedWritePaths.push(normalizedPath);
+        }
+      }
+
       // Detect repo roots and add to session allowances for write access
       const repoRoots = detectRepoRoots(ctx.cwd);
       for (const root of repoRoots) {
@@ -920,6 +929,22 @@ export default function (pi: ExtensionAPI) {
       }
 
       try {
+        const tempPaths = [process.env.TMPDIR, tmpdir()];
+        for (const path of tempPaths) {
+          if (!path) continue;
+          const normalizedPath = resolve(path);
+          if (!sessionAllowedWritePaths.includes(normalizedPath)) {
+            sessionAllowedWritePaths.push(normalizedPath);
+          }
+        }
+
+        const repoRoots = detectRepoRoots(ctx.cwd);
+        for (const root of repoRoots) {
+          if (!sessionAllowedWritePaths.includes(root)) {
+            sessionAllowedWritePaths.push(root);
+          }
+        }
+
         const configExt = config as unknown as {
           ignoreViolations?: Record<string, string[]>;
           enableWeakerNestedSandbox?: boolean;
@@ -928,7 +953,11 @@ export default function (pi: ExtensionAPI) {
 
         await SandboxManager.initialize({
           network: config.network,
-          filesystem: config.filesystem,
+          filesystem: {
+            ...config.filesystem,
+            allowRead: [...(config.filesystem?.allowRead ?? []), ...sessionAllowedWritePaths],
+            allowWrite: [...(config.filesystem?.allowWrite ?? []), ...sessionAllowedWritePaths],
+          },
           ignoreViolations: configExt.ignoreViolations,
           enableWeakerNestedSandbox: configExt.enableWeakerNestedSandbox,
           allowBrowserProcess: configExt.allowBrowserProcess,
