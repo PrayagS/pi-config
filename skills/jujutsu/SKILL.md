@@ -81,12 +81,15 @@ Prefer change IDs in commands — they survive rebases and squashes.
 
 3. **Verify after mutations** — run `jj st` after `squash`, `abandon`, `rebase`, or `restore` to confirm success.
 
-4. **Always run `jj new` after `jj desc -m` when starting work**:
-   - Check `jj st` — if `@` already has changes, run `jj new` first
-   - Describe intent with `jj desc -m "feat: add feature"`
-   - Immediately run `jj new` so described commit becomes parent and new work lands in fresh working-copy commit
-   - Make changes — they auto-apply to new `@`
-   - When finishing task, leave current working-copy commit ready for next `jj desc -m` → `jj new` cycle
+4. **Use `jj commit -m` to finalize work** — it describes `@` and creates a new empty working-copy commit in one step (equivalent to `jj desc -m` + `jj new`, but no risk of forgetting the second command):
+   ```bash
+   # When done with current changes:
+   jj commit -m "feat: add feature"
+   # Now @ is a fresh empty commit, previous work is @-
+   ```
+   - If `@` already has changes when starting new work, commit them first
+   - Make changes — they auto-apply to `@`
+   - When finishing, `jj commit -m` to seal and move on
 
 ## Step 4: Common Operations
 
