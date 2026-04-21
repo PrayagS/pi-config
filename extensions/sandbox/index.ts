@@ -844,9 +844,6 @@ export default function (pi: ExtensionAPI) {
       sandboxInitialized = true;
 
       ctx.ui.setStatus("sandbox", ctx.ui.theme.fg("accent", "🔒 Sandbox"));
-      if (repoRoots.length > 0) {
-        ctx.ui.notify(`Auto-allowed repo roots: ${repoRoots.join(", ")}`, "info");
-      }
     } catch (err) {
       sandboxEnabled = false;
       ctx.ui.notify(
