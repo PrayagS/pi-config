@@ -2,7 +2,7 @@
  * Co-Authored-By Extension
  *
  * Automatically appends a Co-Authored-By trailer to commit/describe messages
- * when the agent runs `git commit`, `jj commit`, or `jj describe`.
+ * when the agent runs `git commit`, `jj commit`, `jj describe`, or `jj new`.
  *
  * Example message:
  *   fix: resolve null pointer
@@ -25,7 +25,7 @@ function isGitCommit(cmd: string): boolean {
 function isJjCommitOrDescribe(cmd: string): boolean {
   const normalized = cmd.replace(/\\\n/g, " ")
   return (
-    /\bjj\s+(commit|ci|describe|desc)\b/.test(normalized) &&
+    /\bjj\s+(commit|ci|describe|desc|new)\b/.test(normalized) &&
     hasMessageFlag(normalized)
   )
 }
@@ -62,7 +62,7 @@ function appendTrailer(cmd: string, modelName: string): string {
   // because the trailer lands on cmd2 instead of jj describe.
   const normalized = cmd.replace(/\\\n/g, " ")
   const match =
-    /\bjj\s+(commit|ci|describe|desc)\b/.exec(normalized) ??
+    /\bjj\s+(commit|ci|describe|desc|new)\b/.exec(normalized) ??
     /\bgit\s+commit\b/.exec(normalized)
 
   if (!match || match.index === undefined) {
