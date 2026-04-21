@@ -53,8 +53,7 @@ Include unless the change is trivially obvious. Explain **what** changed, **why*
 1. Review `jj status` and `jj diff` to understand current changes.
 2. Check commonly used types and scopes: `jj log -n 50 --no-graph -T 'description.first_line() ++ "\n"'`
 3. Compose the description following the format above.
-4. Apply with `jj describe -m "<message>"`.
-5. If this description starts a new unit of work, immediately run `jj new` so new edits land in fresh working-copy commit.
+4. Apply with `jj commit -m "<message>"` — this describes the current working-copy commit and creates a fresh empty `@` on top in one step.
 
 ## Rules
 

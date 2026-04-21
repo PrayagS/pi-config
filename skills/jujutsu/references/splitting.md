@@ -83,13 +83,10 @@ jj-hunk split '{"files": {"src/db/schema.ts": {"action": "keep"}}, "default": "r
 jj-hunk split '{"files": {"src/lib/utils.ts": {"hunks": [0, 2]}}, "default": "reset"}' \
   "refactor: clean up utils"
 
-# 4. Remaining changes become last described commit
-jj describe -m "feat: add new endpoint"
+# 4. Remaining changes become last commit
+jj commit -m "feat: add new endpoint"
 
-# 5. Open fresh working-copy commit after describing
-jj new
-
-# 6. Verify
+# 5. Verify
 jj log -r 'trunk()..@'
 ```
 
