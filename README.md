@@ -33,6 +33,7 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/supacode/` — Supacode busy state + completion notification hooks
 - `extensions/tools/` — tooling controls
 - `extensions/web-search/` — web search tool
+- `extensions/working-indicator/` — phase-aware working spinner (thinking/tool/streaming/working)
 - `extensions/zzz-system-prompt-filter/` — system prompt filtering
 
 ## Skills
