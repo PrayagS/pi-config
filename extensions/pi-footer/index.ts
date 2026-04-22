@@ -951,10 +951,14 @@ export default function (pi: ExtensionAPI) {
   }
 
   function getThinkingLevel(ctx: any): string {
-    const entries = ctx.sessionManager.getEntries()
-    const leafId = ctx.sessionManager.getLeafId()
-    const context = buildSessionContext(entries, leafId)
-    return context.thinkingLevel || "off"
+    try {
+      const entries = ctx.sessionManager.getEntries()
+      const leafId = ctx.sessionManager.getLeafId()
+      const context = buildSessionContext(entries, leafId)
+      return context.thinkingLevel || "off"
+    } catch {
+      return "off"
+    }
   }
 
   function getContextInfo(ctx: any): {
@@ -962,7 +966,12 @@ export default function (pi: ExtensionAPI) {
     used: number
     total: number
   } {
-    const model = ctx.model
+    let model: any
+    try {
+      model = ctx.model
+    } catch {
+      return { percentage: 0, used: 0, total: 0 }
+    }
     const contextWindow = model?.contextWindow ?? 0
     if (contextWindow === 0) return { percentage: 0, used: 0, total: 0 }
 
@@ -1066,72 +1075,87 @@ export default function (pi: ExtensionAPI) {
         },
         invalidate() {},
         render(width: number): string[] {
-          const {
-            percentage,
-            used: ctxUsed,
-            total: ctxTotal,
-          } = getContextInfo(ctx)
+          try {
+            const ctxModel = ctx.model
+            const {
+              percentage,
+              used: ctxUsed,
+              total: ctxTotal,
+            } = getContextInfo(ctx)
 
-          const pwd = abbreviatePath(process.cwd())
-          const modelName = ctx.model?.id?.split("/").pop() || "no-model"
-          let modelStr = theme.fg("muted", modelName)
-          if (ctx.model?.reasoning) {
-            const thinkingLevel = getThinkingLevel(ctx)
-            if (thinkingLevel !== "off") {
-              modelStr +=
-                " " +
-                theme.fg("dim", ">") +
-                " " +
-                theme.fg("accent", thinkingLevel)
+            const pwd = abbreviatePath(process.cwd())
+            const modelName = ctxModel?.id?.split("/").pop() || "no-model"
+            let modelStr = theme.fg("muted", modelName)
+            if (ctxModel?.reasoning) {
+              const thinkingLevel = getThinkingLevel(ctx)
+              if (thinkingLevel !== "off") {
+                modelStr +=
+                  " " +
+                  theme.fg("dim", ">") +
+                  " " +
+                  theme.fg("accent", thinkingLevel)
+              }
             }
-          }
 
-          const gauge = renderContextGauge(percentage, theme, ctxUsed, ctxTotal)
+            const gauge = renderContextGauge(
+              percentage,
+              theme,
+              ctxUsed,
+              ctxTotal
+            )
 
-          const sep = " " + theme.fg("dim", ">") + " "
-          const pwdColored = theme.fg("accent", pwd)
-          const modelPart = sep + modelStr
-          const gaugePart = sep + gauge
-          const fullLine = pwdColored + modelPart + gaugePart
+            const sep = " " + theme.fg("dim", ">") + " "
+            const pwdColored = theme.fg("accent", pwd)
+            const modelPart = sep + modelStr
+            const gaugePart = sep + gauge
+            const fullLine = pwdColored + modelPart + gaugePart
 
-          const lines: string[] = []
-          if (visibleWidth(fullLine) <= width) {
-            lines.push(fullLine)
-          } else {
-            // Doesn't fit on one line — stack vertically
-            lines.push(truncateToWidth(pwdColored, width))
-            lines.push(truncateToWidth(modelStr, width))
-            lines.push(truncateToWidth(gauge, width))
-          }
-
-          // Usage display disabled
-          // if (latestUsage && latestUsage.windows.length > 0) {
-          //   const usageLines = renderUsageLine(latestUsage, width, theme);
-          //   for (const line of usageLines) {
-          //     lines.push(truncateToWidth(line, width));
-          //   }
-          // }
-
-          const extensionStatuses =
-            footerData.getExtensionStatuses() as ReadonlyMap<string, string>
-          if (extensionStatuses.size > 0) {
-            const statusParts = formatExtensionStatuses(extensionStatuses)
-            if (statusParts.length > 0) {
-              const statusSep = " " + theme.fg("dim", ">") + " "
-              const statusLine = statusParts
-                .map((part) => theme.fg("dim", part))
-                .join(statusSep)
-              for (let i = 0; i < STATUS_ROW_GAP_LINES; i++) lines.push("")
-              lines.push(
-                truncateToWidth(statusLine, width, theme.fg("dim", "..."))
-              )
+            const lines: string[] = []
+            if (visibleWidth(fullLine) <= width) {
+              lines.push(fullLine)
+            } else {
+              // Doesn't fit on one line — stack vertically
+              lines.push(truncateToWidth(pwdColored, width))
+              lines.push(truncateToWidth(modelStr, width))
+              lines.push(truncateToWidth(gauge, width))
             }
-          }
 
-          return lines
+            // Usage display disabled
+            // if (latestUsage && latestUsage.windows.length > 0) {
+            //   const usageLines = renderUsageLine(latestUsage, width, theme);
+            //   for (const line of usageLines) {
+            //     lines.push(truncateToWidth(line, width));
+            //   }
+            // }
+
+            const extensionStatuses =
+              footerData.getExtensionStatuses() as ReadonlyMap<string, string>
+            if (extensionStatuses.size > 0) {
+              const statusParts = formatExtensionStatuses(extensionStatuses)
+              if (statusParts.length > 0) {
+                const statusSep = " " + theme.fg("dim", ">") + " "
+                const statusLine = statusParts
+                  .map((part) => theme.fg("dim", part))
+                  .join(statusSep)
+                for (let i = 0; i < STATUS_ROW_GAP_LINES; i++) lines.push("")
+                lines.push(
+                  truncateToWidth(statusLine, width, theme.fg("dim", "..."))
+                )
+              }
+            }
+
+            return lines
+          } catch {
+            return [theme.fg("dim", "(session ended)")]
+          }
         },
       }
     })
+  })
+
+  pi.on("session_shutdown", async (_event, ctx) => {
+    if (!ctx.hasUI) return
+    ctx.ui.setFooter(undefined)
   })
 
   // Usage display disabled
