@@ -60,15 +60,13 @@ Phase 3:  Validate Design               → section by section, wait between eac
     ↓
 Phase 4:  Premortem                      → risk analysis, STOP and wait
     ↓
-Phase 5:  Write Plan to PLAN.md         → submit via plannotator_submit_plan
+Phase 5:  Write Plan                    → submit via plannotator_submit_plan
     ↓
 Phase 5b: Review Loop                   → user approves/denies in browser UI
     ↓
-Phase 6:  Save approved plan            → write to explicit path from task
+Phase 6:  Create Todos                  → with mandatory examples/references
     ↓
-Phase 7:  Create Todos                  → with mandatory examples/references
-    ↓
-Phase 8:  Summarize & Exit              → only after todos are created
+Phase 7:  Summarize & Exit              → only after todos are created
 ```
 
 ---
@@ -174,7 +172,7 @@ Skip the premortem for trivial tasks (single file, easy rollback, pure explorati
 
 ---
 
-## Phase 5: Write Plan to PLAN.md
+## Phase 5: Write Plan
 
 **Only after the user confirms the design and premortem.**
 
@@ -182,14 +180,13 @@ Skip the premortem for trivial tasks (single file, easy rollback, pure explorati
 
 This session runs with **Plannotator plan mode** (`--plan`). This means:
 
-- You write your plan to `PLAN.md` (the plannotator plan file)
-- Writes and edits are restricted to `PLAN.md` during planning
-- When the plan is ready, call `plannotator_submit_plan` to open the browser review UI
+- During planning, writes and edits are restricted to markdown files (`.md`/`.mdx`) inside the working directory
+- Write your plan directly to the final path provided in your task (e.g. `.pi/plans/YYYY-MM-DD-<name>/plan.md`)
+- When the plan is ready, call `plannotator_submit_plan` with the `filePath` to open the browser review UI
 - The user will **approve** or **deny with annotations** in the browser
-- If denied: revise the plan using `edit` on `PLAN.md`, then call `plannotator_submit_plan` again
-- If approved: plannotator saves to its archive and grants you full tool access
+- If denied: revise the plan using `edit`, then call `plannotator_submit_plan` again with the same `filePath`
 
-Write the plan to `PLAN.md` using the `write` tool (first draft) or `edit` tool (revisions):
+Write the plan using the `write` tool (first draft) or `edit` tool (revisions):
 ### Plan Structure
 
 ```markdown
@@ -232,11 +229,13 @@ Break the work into bite-sized todos (2-5 minutes each) as checklist items. Each
 - Risk 1
 ```
 
-After writing the plan, call `plannotator_submit_plan` to open the browser review UI:
+After writing the plan, call `plannotator_submit_plan` with the file path to open the browser review UI:
 
 ```
-plannotator_submit_plan(summary: "Brief summary of the plan")
+plannotator_submit_plan(filePath: ".pi/plans/YYYY-MM-DD-<name>/plan.md")
 ```
+
+Use the exact path you wrote the plan to.
 
 **STOP and wait for the user's decision in the browser.**
 
@@ -248,28 +247,13 @@ The user reviews in the Plannotator browser UI:
 
 - **Approved**: You'll get a message confirming approval. Proceed to Phase 6.
 - **Approved with notes**: Proceed to Phase 6, incorporating the notes.
-- **Denied with annotations**: Read the feedback carefully. Use `edit` on `PLAN.md` to address the specific feedback (do NOT rewrite the entire file). Then call `plannotator_submit_plan` again.
+- **Denied with annotations**: Read the feedback carefully. Use `edit` to address the specific feedback (do NOT rewrite the entire file). Then call `plannotator_submit_plan` again with the same `filePath`.
 
 Repeat until approved.
 
 ---
 
-## Phase 6: Save Approved Plan
-
-**Only after the plan is approved.**
-
-Read back `PLAN.md`, then save the approved plan with the plain `write` tool to the explicit path provided in your task.
-Typical path:
-
-```
-.pi/plans/YYYY-MM-DD-<name>/plan.md
-```
-
-Use the orchestrator's exact path if it differs. Report that path back in your final summary so downstream workers and reviewers can read it.
-
----
-
-## Phase 7: Create Todos
+## Phase 6: Create Todos
 
 **Before writing any todos, load the `write-todos` skill** — it defines the required structure, rules, and checklist for writing todos that workers can execute without losing architectural intent.
 
@@ -307,7 +291,7 @@ Workers that receive a todo without examples will report it back as incomplete r
 
 ---
 
-## Phase 8: Summarize & Exit
+## Phase 7: Summarize & Exit
 Your **FINAL message** must include:
 - Spec artifact path (input)
 - Plan artifact path (output)
