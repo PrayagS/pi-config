@@ -34,6 +34,7 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/tools/` — tooling controls
 - `extensions/web-search/` — web search tool
 - `extensions/working-indicator/` — phase-aware working spinner (thinking/tool/streaming/working)
+- `extensions/pi-images/` — image attachments with kitty graphics preview ([credits](extensions/pi-images/README.md#credits))
 - `extensions/zzz-system-prompt-filter/` — system prompt filtering
 
 ## Skills

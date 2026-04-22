@@ -34,6 +34,7 @@
       "./extensions/tools/index.ts",
       "./extensions/web-search/index.ts",
       "./extensions/working-indicator/index.ts",
+      "./extensions/pi-images/index.ts",
       "./extensions/zzz-system-prompt-filter/index.ts"
     ],
     "skills": [
