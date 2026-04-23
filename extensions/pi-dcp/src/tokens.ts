@@ -45,3 +45,15 @@ export function estimateContextTokens(messages: any[]): number {
   }
   return total;
 }
+
+/**
+ * Count tokens in active compress summaries.
+ * Used by summaryBuffer logic to extend effective context limit.
+ */
+export function getActiveSummaryTokens(summaries: { summary: string }[]): number {
+  let total = 0;
+  for (const s of summaries) {
+    total += countTokens(s.summary);
+  }
+  return total;
+}

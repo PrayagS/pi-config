@@ -118,6 +118,12 @@ export interface DcpConfig {
   turnProtection?: TurnProtection;
   /** Optional log directory override */
   logDir?: string;
+  /**
+   * Extend effective context limit by active summary tokens.
+   * Prevents sessions with many compressed summaries from over-triggering
+   * new compression nudges. Default: true
+   */
+  summaryBuffer?: boolean;
 }
 export type DcpConfigWithPruneRuleObjects = DcpConfig & {
   rules: PruneRule[];

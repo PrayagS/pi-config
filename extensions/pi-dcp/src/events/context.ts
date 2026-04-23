@@ -17,7 +17,7 @@ import type { ToolCacheState } from "../tool-cache";
 import type { CompressSummary } from "../tools/compress";
 import { applyPruningWorkflow } from "../workflow";
 import { syncToolCache, getPrunableEntries } from "../tool-cache";
-import { extractMessageText } from "../tokens";
+import { extractMessageText, getActiveSummaryTokens } from "../tokens";
 import { extractToolUseIds, hasToolUse, hasToolResult } from "../metadata";
 import {
   buildPrunableToolsList,
@@ -94,6 +94,7 @@ export function createContextEventHandler(options: ContextEventHandlerOptions) {
         nudgeFrequency,
         contextLimit,
         protectedTools,
+        compressSummaries,
         logger
       );
 
@@ -238,6 +239,7 @@ function injectContextInfo(
   nudgeFrequency: number,
   contextLimit: number,
   protectedTools: string[],
+  compressSummaries: CompressSummary[],
   logger: ReturnType<typeof getLogger>
 ): void {
   const parts: string[] = [];
@@ -247,8 +249,13 @@ function injectContextInfo(
     lastToolWasDcp.value = false;
   } else {
     // Check context size for compress nudge
+    // Summary buffer: extend limit by active summary tokens so already-compressed
+    // content doesn't keep triggering new compression nudges
     const totalTokens = estimateContextTokens(messages);
-    const isCompressNudge = totalTokens > contextLimit;
+    const summaryTokenExtension =
+      config.summaryBuffer !== false ? getActiveSummaryTokens(compressSummaries) : 0;
+    const effectiveLimit = contextLimit + summaryTokenExtension;
+    const isCompressNudge = totalTokens > effectiveLimit;
     const isPeriodicNudge = nudgeCounter.value >= nudgeFrequency;
 
     // Check dumb-zone signal (optional — only fires if pi-dumb-zone is loaded)
@@ -277,7 +284,12 @@ function injectContextInfo(
         );
       } else if (isCompressNudge) {
         parts.push(COMPRESS_NUDGE_PROMPT);
-        logger.info(`Context ~${totalTokens} tokens, exceeds limit ${contextLimit}`);
+        logger.info(
+          `Context ~${totalTokens} tokens, exceeds effective limit ${effectiveLimit}` +
+            (summaryTokenExtension > 0
+              ? ` (base ${contextLimit} + ${summaryTokenExtension} summary buffer)`
+              : ``)
+        );
       } else {
         parts.push(NUDGE_PROMPT);
       }
