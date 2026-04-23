@@ -1,45 +1,67 @@
 /**
  * Deduplication Rule
  *
- * Removes duplicate tool outputs based on content hash.
- * Messages with identical content are considered duplicates,
- * and only the first occurrence is kept.
+ * For tool results: compares by tool signature (same tool name + same arguments).
+ * Keeps the LATEST occurrence and prunes earlier ones (stale reads/results).
+ *
+ * For text-only messages: compares by content hash (existing behavior).
+ * Keeps the FIRST occurrence and prunes later duplicates.
  */
 
 import type { PruneRule } from "../types";
-import { hashMessage } from "../metadata";
+import { hashMessage, isTurnProtected, resolveToolCallInfo } from "../metadata";
 import { getLogger } from "../logger";
 
 export const deduplicationRule: PruneRule = {
   name: "deduplication",
-  description: "Remove duplicate tool outputs based on content hash",
+  description: "Remove duplicate tool outputs and text messages",
 
-  /**
-   * Prepare phase: Hash each message for comparison
-   */
   prepare(msg, ctx) {
-    // Hash the message content
     msg.metadata.hash = hashMessage(msg.message);
+
+    // For toolResults: resolve tool signature from paired assistant
+    if (msg.message.role === "toolResult") {
+      const info = resolveToolCallInfo(msg, ctx.messages);
+      if (info) {
+        msg.metadata.toolSignature = info.signature;
+        msg.metadata.pairedAssistantIndex = info.assistantIndex;
+      }
+    }
   },
 
-  /**
-   * Process phase: Mark duplicates for pruning
-   */
   process(msg, ctx) {
-    // Skip if already marked for pruning by another rule
     if (msg.metadata.shouldPrune) return;
-
-    // Never prune user messages
     if (msg.message.role === "user") return;
 
-    // Never prune assistant messages with tool calls — each invocation is unique
+    const currentTurn = ctx.messages[ctx.messages.length - 1]?.metadata.turnIndex ?? 0;
+    if (isTurnProtected(msg, currentTurn, ctx.config.turnProtection)) return;
+
+    // ToolResult dedup: compare by tool signature, keep LATEST (prune earlier)
+    if (msg.message.role === "toolResult" && msg.metadata.toolSignature) {
+      const laterDuplicate = ctx.messages
+        .slice(ctx.index + 1)
+        .some((m) => m.metadata.toolSignature === msg.metadata.toolSignature);
+
+      if (laterDuplicate) {
+        msg.metadata.shouldPrune = true;
+        msg.metadata.pruneReason = `duplicate tool call (${msg.metadata.toolSignature})`;
+
+        if (ctx.config.debug) {
+          getLogger().debug(
+            `Dedup: marking earlier tool result at index ${ctx.index} (sig: ${msg.metadata.toolSignature})`
+          );
+        }
+      }
+      return; // toolResult handled, skip content hash path
+    }
+
+    // Never dedup assistants with tool calls directly (cascade handles them)
     if (msg.metadata.hasToolUse) return;
 
-    // Check if we've seen this exact content before
+    // Text message dedup: compare by content hash, keep FIRST (prune later)
     const currentHash = msg.metadata.hash;
     if (!currentHash) return;
 
-    // Look for earlier message with same hash
     const seenBefore = ctx.messages
       .slice(0, ctx.index)
       .some((m) => m.metadata.hash === currentHash);

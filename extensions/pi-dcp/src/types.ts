@@ -29,6 +29,14 @@ export interface MessageMetadata {
   isError?: boolean;
   /** Whether error was resolved by later success */
   errorResolved?: boolean;
+  /** Turn index this message belongs to (incremented on each user message) */
+  turnIndex?: number;
+  /** Whether protected by turn-based protection */
+  protectedByTurn?: boolean;
+  /** Normalized tool signature (toolName::JSON(sortedArgs)) for dedup/error matching */
+  toolSignature?: string;
+  /** Index of the paired assistant message (for toolResult messages) */
+  pairedAssistantIndex?: number;
   /** Recency score (distance from end) */
   recencyScore?: number;
   /** Whether protected by recency rule */

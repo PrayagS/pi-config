@@ -194,3 +194,113 @@ export function hasToolUse(message: AgentMessage): boolean {
 export function hasToolResult(message: AgentMessage): boolean {
   return message.role === "toolResult";
 }
+
+// ---- Tool call cross-referencing ----
+
+export interface ToolCallInfo {
+  /** Index of the paired assistant message */
+  assistantIndex: number;
+  /** The toolCall ID */
+  toolCallId: string;
+  /** Tool name */
+  toolName: string;
+  /** Tool arguments from the assistant's toolCall block */
+  arguments: Record<string, any>;
+  /** Normalized signature: toolName::JSON(sortedArgs) */
+  signature: string;
+}
+
+/**
+ * Resolve a toolResult's paired assistant toolCall info.
+ * Walks backward from the toolResult to find the assistant with matching toolCallId.
+ */
+export function resolveToolCallInfo(
+  msg: MessageWithMetadata,
+  allMessages: MessageWithMetadata[]
+): ToolCallInfo | null {
+  if (msg.message.role !== "toolResult") return null;
+  const toolCallId = (msg.message as any).toolCallId;
+  if (!toolCallId) return null;
+
+  const msgIndex = allMessages.indexOf(msg);
+  for (let i = msgIndex - 1; i >= 0; i--) {
+    const candidate = allMessages[i];
+    if (candidate.message.role !== "assistant") continue;
+    if (!Array.isArray(candidate.message.content)) continue;
+
+    for (const block of candidate.message.content as any[]) {
+      if (block?.type === "toolCall" && block.id === toolCallId) {
+        const args = block.arguments || {};
+        return {
+          assistantIndex: i,
+          toolCallId,
+          toolName: block.name || "unknown",
+          arguments: args,
+          signature: createToolSignature(block.name || "unknown", args),
+        };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Create a normalized tool signature for dedup/matching.
+ * Same tool + same args = same signature regardless of call ID.
+ */
+export function createToolSignature(tool: string, parameters?: any): string {
+  if (!parameters || Object.keys(parameters).length === 0) return tool;
+  const sorted = sortObjectKeys(normalizeParameters(parameters));
+  return `${tool}::${JSON.stringify(sorted)}`;
+}
+
+function normalizeParameters(params: any): any {
+  if (typeof params !== "object" || params === null) return params;
+  if (Array.isArray(params)) return params;
+  const normalized: any = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      normalized[key] = value;
+    }
+  }
+  return normalized;
+}
+
+function sortObjectKeys(obj: any): any {
+  if (typeof obj !== "object" || obj === null) return obj;
+  if (Array.isArray(obj)) return obj.map(sortObjectKeys);
+  const sorted: any = {};
+  for (const key of Object.keys(obj).sort()) {
+    sorted[key] = sortObjectKeys(obj[key]);
+  }
+  return sorted;
+}
+
+/**
+ * Annotate turn indices on all messages.
+ * A turn increments on each user message. Every message between two user
+ * messages shares the same turn index.
+ */
+export function annotateTurnIndices(messages: MessageWithMetadata[]): void {
+  let turn = 0;
+  for (const msg of messages) {
+    if (msg.message.role === "user") {
+      turn++;
+    }
+    msg.metadata.turnIndex = turn;
+  }
+}
+
+/**
+ * Check if a message is protected by turn-based protection.
+ * Messages from the last N turns (relative to currentTurn) are protected.
+ */
+export function isTurnProtected(
+  msg: MessageWithMetadata,
+  currentTurn: number,
+  turnProtection?: { enabled: boolean; turns: number }
+): boolean {
+  if (!turnProtection?.enabled || !turnProtection.turns) return false;
+  if (msg.metadata.turnIndex === undefined) return false;
+  return currentTurn - msg.metadata.turnIndex < turnProtection.turns;
+}

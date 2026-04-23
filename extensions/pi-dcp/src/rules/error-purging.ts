@@ -2,28 +2,53 @@
  * Error Purging Rule
  *
  * Removes resolved errors from context.
- * If an error is followed by a successful retry of the same operation,
- * the error can be pruned as it's no longer relevant.
+ * If an error is followed by a successful retry of the same operation
+ * (same tool name + same arguments), the error can be pruned.
+ *
+ * Uses tool signature matching (from assistant toolCall arguments) for
+ * toolResult errors, and content-based matching for other error types.
  */
 
 import type { PruneRule } from "../types";
-import { isErrorMessage, isSameOperation } from "../metadata";
+import {
+  isErrorMessage,
+  isSameOperation,
+  isTurnProtected,
+  resolveToolCallInfo,
+} from "../metadata";
 import { getLogger } from "../logger";
 
 export const errorPurgingRule: PruneRule = {
   name: "error-purging",
   description: "Remove resolved errors from context",
 
-  /**
-   * Prepare phase: Identify errors and check if they were resolved
-   */
   prepare(msg, ctx) {
-    // Mark if message is an error
     const isError = isErrorMessage(msg.message);
     msg.metadata.isError = isError;
 
-    if (isError) {
-      // Look ahead for a successful retry of the same operation
+    if (!isError) return;
+
+    if (msg.message.role === "toolResult") {
+      // For tool errors: resolve signature and match by it
+      const errorInfo = resolveToolCallInfo(msg, ctx.messages);
+      if (errorInfo) {
+        const laterSuccess = ctx.messages.slice(ctx.index + 1).find((m) => {
+          if (m.message.role !== "toolResult") return false;
+          if (isErrorMessage(m.message)) return false;
+          const successInfo = resolveToolCallInfo(m, ctx.messages);
+          return successInfo?.signature === errorInfo.signature;
+        });
+
+        msg.metadata.errorResolved = !!laterSuccess;
+
+        if (ctx.config.debug && laterSuccess) {
+          getLogger().debug(
+            `ErrorPurging: resolved error at index ${ctx.index} (sig: ${errorInfo.signature})`
+          );
+        }
+      }
+    } else {
+      // For non-tool errors: fall back to content-based matching
       const laterSuccess = ctx.messages
         .slice(ctx.index + 1)
         .find((m) => isSameOperation(m.message, msg.message) && !isErrorMessage(m.message));
@@ -36,17 +61,13 @@ export const errorPurgingRule: PruneRule = {
     }
   },
 
-  /**
-   * Process phase: Mark resolved errors for pruning
-   */
   process(msg, ctx) {
-    // Skip if already marked for pruning
     if (msg.metadata.shouldPrune) return;
-
-    // Never prune user messages
     if (msg.message.role === "user") return;
 
-    // Prune if it's an error that was resolved
+    const currentTurn = ctx.messages[ctx.messages.length - 1]?.metadata.turnIndex ?? 0;
+    if (isTurnProtected(msg, currentTurn, ctx.config.turnProtection)) return;
+
     if (msg.metadata.isError && msg.metadata.errorResolved) {
       msg.metadata.shouldPrune = true;
       msg.metadata.pruneReason = "error resolved by later success";

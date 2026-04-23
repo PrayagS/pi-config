@@ -11,6 +11,7 @@ import {
   extractToolUseIds,
   hasToolUse,
   hasToolResult,
+  annotateTurnIndices,
 } from "./metadata";
 import { resolveRule } from "./registry";
 import { getLogger } from "./logger";
@@ -36,6 +37,9 @@ export function applyPruningWorkflow(
 
   // Phase 1: Wrap messages with metadata containers
   const withMetadata = messages.map(createMessageWithMetadata);
+
+  // Phase 1.5: Annotate turn indices for turn-based protection
+  annotateTurnIndices(withMetadata);
 
   // Phase 2: PREPARE - Run prepare phase for all rules
   const logger = getLogger();
@@ -71,6 +75,12 @@ export function applyPruningWorkflow(
     const rule = resolveRule(ruleRef);
 
     if (rule.process) {
+      // Before tool-pairing: cascade prune to assistants whose results are all pruned.
+      // This prevents tool-pairing from un-pruning results that dedup/superseded-writes marked.
+      if (rule.name === "tool-pairing") {
+        cascadePruneToAssistants(withMetadata, config);
+      }
+
       withMetadata.forEach((msg, index) => {
         try {
           rule.process!(msg, {
@@ -106,6 +116,47 @@ export function applyPruningWorkflow(
   }
 
   return filtered;
+}
+
+/**
+ * Cascade prune decisions to assistants.
+ * If ALL of an assistant's toolResults are marked for pruning,
+ * mark the assistant too — otherwise tool-pairing will un-prune the results
+ * to maintain pair integrity.
+ */
+function cascadePruneToAssistants(
+  messages: MessageWithMetadata[],
+  config: DcpConfigWithPruneRuleObjects
+): void {
+  const logger = getLogger();
+
+  for (const msg of messages) {
+    if (msg.metadata.shouldPrune) continue;
+    if (!hasToolUse(msg.message)) continue;
+
+    const toolIds = extractToolUseIds(msg.message);
+    if (toolIds.length === 0) continue;
+
+    const allResultsPruned = toolIds.every((id) => {
+      const result = messages.find(
+        (m) => m.message.role === "toolResult" && (m.message as any).toolCallId === id
+      );
+      // If the result doesn't exist, don't cascade (safety)
+      if (!result) return false;
+      return result.metadata.shouldPrune === true;
+    });
+
+    if (allResultsPruned) {
+      msg.metadata.shouldPrune = true;
+      msg.metadata.pruneReason = "all tool results pruned";
+
+      if (config.debug) {
+        logger.debug(
+          `Cascade: marking assistant at index ${messages.indexOf(msg)} (all tool results pruned)`
+        );
+      }
+    }
+  }
 }
 
 /**
