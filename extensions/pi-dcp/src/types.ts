@@ -107,6 +107,26 @@ export interface TurnProtection {
   turns: number;
 }
 
+/**
+ * A limit value: absolute token count or percentage of model context window.
+ * Percentage strings like "60%" resolve against the model's contextWindow.
+ */
+export type LimitValue = number | `${number}%`;
+
+/**
+ * Configurable context thresholds for nudge triggers.
+ *
+ * - `min` — soft threshold: triggers a gentle compression nudge
+ * - `max` — hard threshold: triggers an urgent compression nudge
+ * - `modelMin` / `modelMax` — per-model overrides keyed by model id
+ */
+export interface ContextLimits {
+  min: LimitValue;
+  max: LimitValue;
+  modelMin?: Record<string, LimitValue>;
+  modelMax?: Record<string, LimitValue>;
+}
+
 export interface DcpConfig {
   /** Master enable/disable toggle */
   enabled?: boolean;
@@ -124,6 +144,8 @@ export interface DcpConfig {
    * new compression nudges. Default: true
    */
   summaryBuffer?: boolean;
+  /** Context thresholds for compression nudges */
+  contextLimits?: ContextLimits;
 }
 export type DcpConfigWithPruneRuleObjects = DcpConfig & {
   rules: PruneRule[];

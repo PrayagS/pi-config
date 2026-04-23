@@ -13,6 +13,7 @@ import {
 import { loadConfig as bunfigLoad } from "bunfig";
 import { getRule, getRuleNames } from "./registry";
 import { getLogger } from "./logger";
+import { DEFAULT_CONTEXT_LIMITS, validateContextLimits } from "./context-limits";
 
 /**
  * Default configuration
@@ -24,6 +25,7 @@ const DEFAULT_CONFIG: DcpConfigWithRuleRefs = {
   keepRecentCount: 10,
   turnProtection: { enabled: true, turns: 3 },
   summaryBuffer: true,
+  contextLimits: DEFAULT_CONTEXT_LIMITS,
 };
 
 /**
@@ -85,6 +87,13 @@ export async function loadConfig(pi: ExtensionAPI): Promise<DcpConfigWithPruneRu
     getLogger().warn(
       `The following configured rules are invalid and will be ignored: ${invalidRuleNames.join(", ")}`
     );
+  }
+
+  // Validate contextLimits
+  const limitErrors = validateContextLimits(config.contextLimits);
+  if (limitErrors.length > 0) {
+    getLogger().warn(`Invalid contextLimits config, using defaults: ${limitErrors.join("; ")}`);
+    config.contextLimits = DEFAULT_CONTEXT_LIMITS;
   }
 
   return {

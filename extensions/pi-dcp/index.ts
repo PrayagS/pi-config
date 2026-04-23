@@ -106,7 +106,6 @@ export default async function (pi: ExtensionAPI) {
 
   // Config for LLM-driven features
   const nudgeFrequency = 15;
-  const contextLimit = 120_000;
   const protectedTools = [...DEFAULT_PROTECTED_TOOLS];
 
   // Register commands
@@ -203,7 +202,6 @@ export default async function (pi: ExtensionAPI) {
       lastToolWasDcp,
       nudgeCounter,
       nudgeFrequency,
-      contextLimit,
       protectedTools,
     })
   );

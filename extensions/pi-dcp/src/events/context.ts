@@ -11,7 +11,7 @@
 
 import type { ContextEvent, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { DcpConfigWithPruneRuleObjects } from "../types";
+import type { DcpConfigWithPruneRuleObjects, ContextLimits } from "../types";
 import type { StatsTracker } from "../cmds/stats";
 import type { ToolCacheState } from "../tool-cache";
 import type { CompressSummary } from "../tools/compress";
@@ -29,6 +29,7 @@ import {
 import { estimateContextTokens } from "../tokens";
 import { getLogger } from "../logger";
 import { readDumbZoneSignal, type DumbZoneSignal } from "../dumb-zone-bridge";
+import { isContextOverLimits } from "../context-limits";
 
 export interface ContextEventHandlerOptions {
   config: DcpConfigWithPruneRuleObjects;
@@ -41,20 +42,18 @@ export interface ContextEventHandlerOptions {
   nudgeCounter: { value: number };
   /** Nudge every N turns */
   nudgeFrequency: number;
-  /** Context token limit before compress nudge */
-  contextLimit: number;
   /** Protected tool names that can't be pruned */
   protectedTools: string[];
 }
 
 const PRUNED_REPLACEMENT =
-  "[Output removed to save context — information superseded or no longer needed]";
+  "[Output removed to save context - information superseded or no longer needed]";
 
 /**
  * Creates a context event handler that applies both automatic and LLM-driven pruning.
  */
 export function createContextEventHandler(options: ContextEventHandlerOptions) {
-  const {
+    const {
     config,
     statsTracker,
     toolCacheState,
@@ -62,7 +61,6 @@ export function createContextEventHandler(options: ContextEventHandlerOptions) {
     lastToolWasDcp,
     nudgeCounter,
     nudgeFrequency,
-    contextLimit,
     protectedTools,
   } = options;
 
@@ -81,7 +79,7 @@ export function createContextEventHandler(options: ContextEventHandlerOptions) {
       // Layer 2: Apply LLM-driven prune/distill/compress decisions
       messages = applyLlmDrivenPruning(messages, toolCacheState, compressSummaries, logger);
 
-      // Layer 2.5: Final safety net — fix any orphaned tool pairs from layer 2
+      // Layer 2.5: Final safety net - fix any orphaned tool pairs from layer 2
       messages = repairOrphanedToolPairsPostPruning(messages, logger);
 
       // Layer 3: Inject prunable-tools list and nudges
@@ -92,9 +90,9 @@ export function createContextEventHandler(options: ContextEventHandlerOptions) {
         lastToolWasDcp,
         nudgeCounter,
         nudgeFrequency,
-        contextLimit,
         protectedTools,
         compressSummaries,
+        ctx,
         logger
       );
 
@@ -145,7 +143,7 @@ function applyLlmDrivenPruning(
     return messages;
   }
 
-  // Find the last assistant message — Anthropic requires thinking blocks in
+  // Find the last assistant message - Anthropic requires thinking blocks in
   // the latest assistant message to remain completely unmodified.
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant") ?? null;
 
@@ -203,7 +201,7 @@ function applyLlmDrivenPruning(
       }
     }
 
-    // Handle assistant messages — remove toolCall blocks for pruned write/edit
+    // Handle assistant messages - remove toolCall blocks for pruned write/edit
     if (msg.role === "assistant" && Array.isArray(msg.content)) {
       const filtered = msg.content.filter((block: any) => {
         if (block.type !== "toolCall") return true;
@@ -237,9 +235,9 @@ function injectContextInfo(
   lastToolWasDcp: { value: boolean },
   nudgeCounter: { value: number },
   nudgeFrequency: number,
-  contextLimit: number,
   protectedTools: string[],
   compressSummaries: CompressSummary[],
+  ctx: ExtensionContext,
   logger: ReturnType<typeof getLogger>
 ): void {
   const parts: string[] = [];
@@ -248,14 +246,25 @@ function injectContextInfo(
     parts.push(COOLDOWN_PROMPT);
     lastToolWasDcp.value = false;
   } else {
-    // Check context size for compress nudge
-    // Summary buffer: extend limit by active summary tokens so already-compressed
-    // content doesn't keep triggering new compression nudges
+    // Resolve model-aware thresholds
+    const modelId = ctx.model?.id;
+    const modelContextWindow = ctx.model?.contextWindow ?? ctx.getContextUsage()?.contextWindow;
+
     const totalTokens = estimateContextTokens(messages);
     const summaryTokenExtension =
       config.summaryBuffer !== false ? getActiveSummaryTokens(compressSummaries) : 0;
-    const effectiveLimit = contextLimit + summaryTokenExtension;
-    const isCompressNudge = totalTokens > effectiveLimit;
+
+    const { effectiveMin, effectiveMax } = isContextOverLimits(
+      totalTokens,
+      config.contextLimits,
+      modelId,
+      modelContextWindow
+    );
+
+    // Adjust for summary buffer: extend limits by active summary tokens
+    const adjustedOverMax = totalTokens > effectiveMax + summaryTokenExtension;
+    const adjustedOverMin = totalTokens > effectiveMin + summaryTokenExtension;
+
     const isPeriodicNudge = nudgeCounter.value >= nudgeFrequency;
 
     // Check dumb-zone signal (optional — only fires if pi-dumb-zone is loaded)
@@ -265,7 +274,7 @@ function injectContextInfo(
       (dumbZoneSignal.severity === "danger" || dumbZoneSignal.severity === "critical");
 
     // Show prunable-tools list + nudge when any trigger fires
-    if (isCompressNudge || isPeriodicNudge || isDumbZoneNudge) {
+    if (adjustedOverMax || adjustedOverMin || isPeriodicNudge || isDumbZoneNudge) {
       const entries = getPrunableEntries(state, protectedTools, 5, config.turnProtection);
       const prunableList = buildPrunableToolsList(entries);
       if (prunableList) {
@@ -282,12 +291,20 @@ function injectContextInfo(
         logger.info(
           `Dumb zone signal: ${dumbZoneSignal!.severity} at ${dumbZoneSignal!.utilization.toFixed(1)}%`
         );
-      } else if (isCompressNudge) {
+      } else if (adjustedOverMax) {
         parts.push(COMPRESS_NUDGE_PROMPT);
         logger.info(
-          `Context ~${totalTokens} tokens, exceeds effective limit ${effectiveLimit}` +
+          `Context ~${totalTokens} tokens, exceeds max limit ${effectiveMax}` +
             (summaryTokenExtension > 0
-              ? ` (base ${contextLimit} + ${summaryTokenExtension} summary buffer)`
+              ? ` (+ ${summaryTokenExtension} summary buffer)`
+              : ``)
+        );
+      } else if (adjustedOverMin) {
+        parts.push(NUDGE_PROMPT);
+        logger.info(
+          `Context ~${totalTokens} tokens, exceeds min limit ${effectiveMin}` +
+            (summaryTokenExtension > 0
+              ? ` (+ ${summaryTokenExtension} summary buffer)`
               : ``)
         );
       } else {
