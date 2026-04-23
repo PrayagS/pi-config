@@ -7,6 +7,7 @@
 
 import { Type } from "@sinclair/typebox";
 import type { ToolCacheState } from "../tool-cache";
+import { isToolProtected } from "../protected-tools";
 import { getLogger } from "../logger";
 
 export interface CompressSummary {
@@ -66,7 +67,7 @@ export function executeCompress(
 
     const entry = state.cache.get(callId);
     if (!entry) continue;
-    if (protectedTools.includes(entry.toolName)) continue;
+    if (isToolProtected(entry.toolName, protectedTools)) continue;
 
     state.prunedIds.add(callId);
     compressedIds.push(callId);

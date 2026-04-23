@@ -7,6 +7,7 @@
 
 import { Type } from "@sinclair/typebox";
 import type { ToolCacheState } from "../tool-cache";
+import { isToolProtected } from "../protected-tools";
 import { getLogger } from "../logger";
 
 export const pruneToolName = "dcp_prune";
@@ -50,7 +51,7 @@ export function executePrune(
       continue;
     }
 
-    if (protectedTools.includes(entry.toolName)) {
+    if (isToolProtected(entry.toolName, protectedTools)) {
       skipped.push(`${idStr} (protected: ${entry.toolName})`);
       continue;
     }

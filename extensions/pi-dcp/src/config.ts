@@ -9,7 +9,13 @@ import {
   PruneRule,
   isPruneRuleObject,
   type DcpConfig,
+  type ProtectedToolsConfig,
 } from "./types";
+import {
+  DEFAULT_PROTECTED_TOOLS,
+  COMPRESS_PROTECTED_TOOLS,
+  mergeProtectedTools,
+} from "./protected-tools";
 import { loadConfig as bunfigLoad } from "bunfig";
 import { getRule, getRuleNames } from "./registry";
 import { getLogger } from "./logger";
@@ -26,6 +32,10 @@ const DEFAULT_CONFIG: DcpConfigWithRuleRefs = {
   turnProtection: { enabled: true, turns: 3 },
   summaryBuffer: true,
   contextLimits: DEFAULT_CONTEXT_LIMITS,
+  protectedTools: {
+    global: [],
+    compress: [],
+  },
 };
 
 /**
@@ -110,6 +120,27 @@ export function getDefaultConfig(): DcpConfig {
 }
 
 /**
+ * Resolve the effective protected tool lists from config.
+ * Merges user config with built-in defaults.
+ *
+ * Returns:
+ * - `global` — applies to all pruning (auto rules + LLM tools)
+ * - `compress` — additional tools protected during compression (merged with global)
+ */
+export function resolveProtectedTools(userConfig?: ProtectedToolsConfig): {
+  global: string[];
+  compress: string[];
+} {
+  const userGlobal = userConfig?.global ?? [];
+  const userCompress = userConfig?.compress ?? [];
+
+  const globalList = mergeProtectedTools(DEFAULT_PROTECTED_TOOLS, userGlobal);
+  const compressList = mergeProtectedTools(globalList, COMPRESS_PROTECTED_TOOLS, userCompress);
+
+  return { global: globalList, compress: compressList };
+}
+
+/**
  * Generate sample configuration file content
  * Used by the init command to create dcp.config.ts
  */
@@ -174,6 +205,13 @@ export default {
 
 	// Number of recent messages to always keep (for recency rule)
 	keepRecentCount: 10,
+
+	// Protected tools — shielded from pruning. Supports globs (e.g. "subagent*")
+	// Built-in defaults: dcp_*, todo, subagent*, context_*, plannotator_submit_plan
+	// protectedTools: {
+	//   global: [],       // Additional tools protected from ALL pruning
+	//   compress: [],     // Additional tools protected from compression only
+	// },
 } satisfies DcpConfig;
 `;
 }

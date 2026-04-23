@@ -7,6 +7,7 @@
 
 import { Type } from "@sinclair/typebox";
 import type { ToolCacheState } from "../tool-cache";
+import { isToolProtected } from "../protected-tools";
 import { getLogger } from "../logger";
 
 export const distillToolName = "dcp_distill";
@@ -56,7 +57,7 @@ export function executeDistill(
       continue;
     }
 
-    if (protectedTools.includes(entry.toolName)) {
+    if (isToolProtected(entry.toolName, protectedTools)) {
       skipped.push(`${target.id} (protected: ${entry.toolName})`);
       continue;
     }

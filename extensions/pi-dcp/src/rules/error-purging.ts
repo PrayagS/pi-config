@@ -16,6 +16,7 @@ import {
   isTurnProtected,
   resolveToolCallInfo,
 } from "../metadata";
+import { isToolProtected } from "../protected-tools";
 import { getLogger } from "../logger";
 
 export const errorPurgingRule: PruneRule = {
@@ -64,6 +65,11 @@ export const errorPurgingRule: PruneRule = {
   process(msg, ctx) {
     if (msg.metadata.shouldPrune) return;
     if (msg.message.role === "user") return;
+
+    // Skip protected tools
+    const toolName = (msg.message as any).toolName;
+    const protectedList = ctx.config.resolvedProtectedTools?.global ?? [];
+    if (toolName && isToolProtected(toolName, protectedList)) return;
 
     const currentTurn = ctx.messages[ctx.messages.length - 1]?.metadata.turnIndex ?? 0;
     if (isTurnProtected(msg, currentTurn, ctx.config.turnProtection)) return;

@@ -7,6 +7,7 @@
 
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { countTokens, extractMessageText } from "./tokens";
+import { isToolProtected } from "./protected-tools";
 
 export interface ToolCacheEntry {
   /** Original tool call ID (e.g. toolu_01ABC) */
@@ -164,7 +165,7 @@ export function getPrunableEntries(
 
     const entry = state.cache.get(callId);
     if (!entry) continue;
-    if (protectedTools.includes(entry.toolName)) continue;
+    if (isToolProtected(entry.toolName, protectedTools)) continue;
 
     // Turn protection: skip entries from the last N agent turns
     if (

@@ -14,7 +14,7 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { StatsTracker } from "./src/cmds/stats";
-import { loadConfig } from "./src/config";
+import { loadConfig, resolveProtectedTools } from "./src/config";
 import { createStatsCommand } from "./src/cmds/stats";
 import { createDebugCommand } from "./src/cmds/debug";
 import { createToggleCommand } from "./src/cmds/toggle";
@@ -34,6 +34,7 @@ import { errorPurgingRule } from "./src/rules/error-purging";
 import { toolPairingRule } from "./src/rules/tool-pairing";
 import { recencyRule } from "./src/rules/recency";
 import { DcpConfig, DcpConfigWithPruneRuleObjects } from "./src/types";
+import { isToolProtected } from "./src/protected-tools";
 
 // Tool cache and LLM-driven tools
 import { createToolCacheState, type ToolCacheState } from "./src/tool-cache";
@@ -67,9 +68,6 @@ registerRule(recencyRule);
 
 /** DCP tool names for cooldown detection */
 const DCP_TOOL_NAMES = [pruneToolName, distillToolName, compressToolName];
-
-/** Default protected tools that shouldn't be pruned */
-const DEFAULT_PROTECTED_TOOLS = ["dcp_prune", "dcp_distill", "dcp_compress"];
 
 /** Custom entry types for state persistence */
 const ENTRY_TYPE_PRUNE = "dcp-prune";
@@ -106,7 +104,12 @@ export default async function (pi: ExtensionAPI) {
 
   // Config for LLM-driven features
   const nudgeFrequency = 15;
-  const protectedTools = [...DEFAULT_PROTECTED_TOOLS];
+  const resolved = resolveProtectedTools(config.protectedTools);
+  const protectedTools = resolved.global;
+  const compressProtectedTools = resolved.compress;
+
+  // Attach resolved lists to config so rules can access them
+  config.resolvedProtectedTools = resolved;
 
   // Register commands
   pi.registerCommand("dcp-debug", createDebugCommand(config));
@@ -164,7 +167,7 @@ export default async function (pi: ExtensionAPI) {
     description: compressToolDescription,
     parameters: compressToolParameters,
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-      const result = executeCompress(toolCacheState, compressSummaries, params, protectedTools);
+      const result = executeCompress(toolCacheState, compressSummaries, params, compressProtectedTools);
       lastToolWasDcp.value = true;
       nudgeCounter.value = 0;
 

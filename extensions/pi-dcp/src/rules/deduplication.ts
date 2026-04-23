@@ -10,6 +10,7 @@
 
 import type { PruneRule } from "../types";
 import { hashMessage, isTurnProtected, resolveToolCallInfo } from "../metadata";
+import { isToolProtected } from "../protected-tools";
 import { getLogger } from "../logger";
 
 export const deduplicationRule: PruneRule = {
@@ -38,6 +39,10 @@ export const deduplicationRule: PruneRule = {
 
     // ToolResult dedup: compare by tool signature, keep LATEST (prune earlier)
     if (msg.message.role === "toolResult" && msg.metadata.toolSignature) {
+      // Skip protected tools
+      const toolName = (msg.message as any).toolName;
+      const protectedList = ctx.config.resolvedProtectedTools?.global ?? [];
+      if (toolName && isToolProtected(toolName, protectedList)) return;
       const laterDuplicate = ctx.messages
         .slice(ctx.index + 1)
         .some((m) => m.metadata.toolSignature === msg.metadata.toolSignature);

@@ -127,6 +127,18 @@ export interface ContextLimits {
   modelMax?: Record<string, LimitValue>;
 }
 
+/**
+ * Protected tools configuration.
+ * Global list applies to all pruning (auto rules + LLM tools).
+ * Scope-specific lists are merged with global for that operation.
+ */
+export interface ProtectedToolsConfig {
+  /** Tools protected from ALL pruning. Merged with built-in defaults. */
+  global?: string[];
+  /** Additional tools protected during compression (merged with global). */
+  compress?: string[];
+}
+
 export interface DcpConfig {
   /** Master enable/disable toggle */
   enabled?: boolean;
@@ -146,9 +158,23 @@ export interface DcpConfig {
   summaryBuffer?: boolean;
   /** Context thresholds for compression nudges */
   contextLimits?: ContextLimits;
+  /**
+   * Tool protection configuration.
+   * Protected tools are shielded from automatic and LLM-driven pruning.
+   * Supports exact names and glob patterns (e.g. "subagent*").
+   */
+  protectedTools?: ProtectedToolsConfig;
 }
 export type DcpConfigWithPruneRuleObjects = DcpConfig & {
   rules: PruneRule[];
+  /**
+   * Resolved protected tools (built-in defaults + user config merged).
+   * Set at startup by resolveProtectedTools(). Rules use this for checks.
+   */
+  resolvedProtectedTools?: {
+    global: string[];
+    compress: string[];
+  };
 };
 export type DcpConfigWithRuleRefs = DcpConfig & {
   rules: (string | PruneRule)[];
