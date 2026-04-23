@@ -8,6 +8,7 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { countTokens, extractMessageText } from "./tokens";
 import { isToolProtected } from "./protected-tools";
+import { getFilePathsFromToolCall, isFilePathProtected } from "./protected-patterns";
 
 export interface ToolCacheEntry {
   /** Original tool call ID (e.g. toolu_01ABC) */
@@ -152,7 +153,8 @@ export function getPrunableEntries(
   state: ToolCacheState,
   protectedTools: string[] = [],
   skipRecent: number = 5,
-  turnProtection?: { enabled: boolean; turns: number }
+  turnProtection?: { enabled: boolean; turns: number },
+  protectedFilePatterns: string[] = []
 ): { numericId: number; entry: ToolCacheEntry }[] {
   const result: { numericId: number; entry: ToolCacheEntry }[] = [];
 
@@ -166,6 +168,12 @@ export function getPrunableEntries(
     const entry = state.cache.get(callId);
     if (!entry) continue;
     if (isToolProtected(entry.toolName, protectedTools)) continue;
+
+    // File-path protection: skip entries whose file paths match protected patterns
+    if (protectedFilePatterns.length > 0) {
+      const filePaths = getFilePathsFromToolCall(entry.toolName, entry.parameters);
+      if (isFilePathProtected(filePaths, protectedFilePatterns)) continue;
+    }
 
     // Turn protection: skip entries from the last N agent turns
     if (

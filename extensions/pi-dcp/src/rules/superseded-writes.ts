@@ -11,6 +11,7 @@
 import type { PruneRule } from "../types";
 import { extractFilePath, hashMessage, isTurnProtected, resolveToolCallInfo } from "../metadata";
 import { isToolProtected } from "../protected-tools";
+import { getFilePathsFromToolCall, isFilePathProtected } from "../protected-patterns";
 import { getLogger } from "../logger";
 
 export const supersededWritesRule: PruneRule = {
@@ -55,6 +56,12 @@ export const supersededWritesRule: PruneRule = {
     const toolName = (msg.message as any).toolName;
     const protectedList = ctx.config.resolvedProtectedTools?.global ?? [];
     if (toolName && isToolProtected(toolName, protectedList)) return;
+
+    // Skip protected file paths
+    const filePatterns = ctx.config.protectedFilePatterns ?? [];
+    if (filePatterns.length > 0 && msg.metadata.filePath) {
+      if (isFilePathProtected([msg.metadata.filePath], filePatterns)) return;
+    }
 
     const currentTurn = ctx.messages[ctx.messages.length - 1]?.metadata.turnIndex ?? 0;
     if (isTurnProtected(msg, currentTurn, ctx.config.turnProtection)) return;

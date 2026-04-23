@@ -8,6 +8,7 @@
 import { Type } from "@sinclair/typebox";
 import type { ToolCacheState } from "../tool-cache";
 import { isToolProtected } from "../protected-tools";
+import { getFilePathsFromToolCall, isFilePathProtected } from "../protected-patterns";
 import { getLogger } from "../logger";
 
 export const distillToolName = "dcp_distill";
@@ -32,7 +33,8 @@ export const distillToolParameters = Type.Object({
 export function executeDistill(
   state: ToolCacheState,
   params: { targets: { id: string; distillation: string }[] },
-  protectedTools: string[] = []
+  protectedTools: string[] = [],
+  protectedFilePatterns: string[] = []
 ): { distilled: number; skipped: string[]; message: string } {
   const logger = getLogger();
   let distilled = 0;
@@ -60,6 +62,15 @@ export function executeDistill(
     if (isToolProtected(entry.toolName, protectedTools)) {
       skipped.push(`${target.id} (protected: ${entry.toolName})`);
       continue;
+    }
+
+    // File-path protection
+    if (protectedFilePatterns.length > 0) {
+      const filePaths = getFilePathsFromToolCall(entry.toolName, entry.parameters);
+      if (isFilePathProtected(filePaths, protectedFilePatterns)) {
+        skipped.push(`${target.id} (protected file: ${filePaths.join(", ")})`);
+        continue;
+      }
     }
 
     // Mark as pruned and store distillation

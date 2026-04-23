@@ -44,6 +44,8 @@ export interface ContextEventHandlerOptions {
   nudgeFrequency: number;
   /** Protected tool names that can't be pruned */
   protectedTools: string[];
+  /** File path patterns that can't be pruned */
+  protectedFilePatterns: string[];
 }
 
 const PRUNED_REPLACEMENT =
@@ -275,7 +277,7 @@ function injectContextInfo(
 
     // Show prunable-tools list + nudge when any trigger fires
     if (adjustedOverMax || adjustedOverMin || isPeriodicNudge || isDumbZoneNudge) {
-      const entries = getPrunableEntries(state, protectedTools, 5, config.turnProtection);
+      const entries = getPrunableEntries(state, protectedTools, 5, config.turnProtection, config.protectedFilePatterns ?? []);
       const prunableList = buildPrunableToolsList(entries);
       if (prunableList) {
         parts.push(prunableList);

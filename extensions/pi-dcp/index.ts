@@ -110,6 +110,7 @@ export default async function (pi: ExtensionAPI) {
 
   // Attach resolved lists to config so rules can access them
   config.resolvedProtectedTools = resolved;
+  const protectedFilePatterns = config.protectedFilePatterns ?? [];
 
   // Register commands
   pi.registerCommand("dcp-debug", createDebugCommand(config));
@@ -124,7 +125,7 @@ export default async function (pi: ExtensionAPI) {
     description: pruneToolDescription,
     parameters: pruneToolParameters,
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-      const result = executePrune(toolCacheState, params, protectedTools);
+      const result = executePrune(toolCacheState, params, protectedTools, protectedFilePatterns);
       lastToolWasDcp.value = true;
       nudgeCounter.value = 0;
 
@@ -145,7 +146,7 @@ export default async function (pi: ExtensionAPI) {
     description: distillToolDescription,
     parameters: distillToolParameters,
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-      const result = executeDistill(toolCacheState, params, protectedTools);
+      const result = executeDistill(toolCacheState, params, protectedTools, protectedFilePatterns);
       lastToolWasDcp.value = true;
       nudgeCounter.value = 0;
 
@@ -167,7 +168,7 @@ export default async function (pi: ExtensionAPI) {
     description: compressToolDescription,
     parameters: compressToolParameters,
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-      const result = executeCompress(toolCacheState, compressSummaries, params, compressProtectedTools);
+      const result = executeCompress(toolCacheState, compressSummaries, params, compressProtectedTools, protectedFilePatterns);
       lastToolWasDcp.value = true;
       nudgeCounter.value = 0;
 
@@ -206,6 +207,7 @@ export default async function (pi: ExtensionAPI) {
       nudgeCounter,
       nudgeFrequency,
       protectedTools,
+      protectedFilePatterns,
     })
   );
 

@@ -36,6 +36,7 @@ const DEFAULT_CONFIG: DcpConfigWithRuleRefs = {
     global: [],
     compress: [],
   },
+  protectedFilePatterns: [],
 };
 
 /**
@@ -141,6 +142,14 @@ export function resolveProtectedTools(userConfig?: ProtectedToolsConfig): {
 }
 
 /**
+ * Resolve the effective protected file patterns from config.
+ * Returns deduplicated array.
+ */
+export function resolveProtectedFilePatterns(userPatterns?: string[]): string[] {
+  return userPatterns && userPatterns.length > 0 ? [...new Set(userPatterns)] : [];
+}
+
+/**
  * Generate sample configuration file content
  * Used by the init command to create dcp.config.ts
  */
@@ -212,6 +221,14 @@ export default {
 	//   global: [],       // Additional tools protected from ALL pruning
 	//   compress: [],     // Additional tools protected from compression only
 	// },
+
+	// Protected file patterns — file-related tool outputs matching these globs
+	// are shielded from pruning. Supports **, *, ? glob syntax.
+	// protectedFilePatterns: [
+	//   "**/PLAN.md",
+	//   "**/migrations/**",
+	//   ".env*",
+	// ],
 } satisfies DcpConfig;
 `;
 }

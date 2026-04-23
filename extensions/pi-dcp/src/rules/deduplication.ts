@@ -11,6 +11,7 @@
 import type { PruneRule } from "../types";
 import { hashMessage, isTurnProtected, resolveToolCallInfo } from "../metadata";
 import { isToolProtected } from "../protected-tools";
+import { getFilePathsFromToolCall, isFilePathProtected } from "../protected-patterns";
 import { getLogger } from "../logger";
 
 export const deduplicationRule: PruneRule = {
@@ -43,6 +44,16 @@ export const deduplicationRule: PruneRule = {
       const toolName = (msg.message as any).toolName;
       const protectedList = ctx.config.resolvedProtectedTools?.global ?? [];
       if (toolName && isToolProtected(toolName, protectedList)) return;
+
+      // Skip protected file paths
+      const filePatterns = ctx.config.protectedFilePatterns ?? [];
+      if (filePatterns.length > 0 && msg.metadata.toolSignature) {
+        const info = resolveToolCallInfo(msg, ctx.messages);
+        if (info?.arguments) {
+          const filePaths = getFilePathsFromToolCall(info.toolName, info.arguments);
+          if (isFilePathProtected(filePaths, filePatterns)) return;
+        }
+      }
       const laterDuplicate = ctx.messages
         .slice(ctx.index + 1)
         .some((m) => m.metadata.toolSignature === msg.metadata.toolSignature);

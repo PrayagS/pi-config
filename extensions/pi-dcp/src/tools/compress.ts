@@ -8,6 +8,7 @@
 import { Type } from "@sinclair/typebox";
 import type { ToolCacheState } from "../tool-cache";
 import { isToolProtected } from "../protected-tools";
+import { getFilePathsFromToolCall, isFilePathProtected } from "../protected-patterns";
 import { getLogger } from "../logger";
 
 export interface CompressSummary {
@@ -40,7 +41,8 @@ export function executeCompress(
   state: ToolCacheState,
   compressSummaries: CompressSummary[],
   params: { topic: string; startId: string; endId: string; summary: string },
-  protectedTools: string[] = []
+  protectedTools: string[] = [],
+  protectedFilePatterns: string[] = []
 ): { compressed: number; message: string } | { error: string } {
   const logger = getLogger();
 
@@ -68,6 +70,12 @@ export function executeCompress(
     const entry = state.cache.get(callId);
     if (!entry) continue;
     if (isToolProtected(entry.toolName, protectedTools)) continue;
+
+    // File-path protection
+    if (protectedFilePatterns.length > 0) {
+      const filePaths = getFilePathsFromToolCall(entry.toolName, entry.parameters);
+      if (isFilePathProtected(filePaths, protectedFilePatterns)) continue;
+    }
 
     state.prunedIds.add(callId);
     compressedIds.push(callId);

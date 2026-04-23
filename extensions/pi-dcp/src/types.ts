@@ -164,6 +164,13 @@ export interface DcpConfig {
    * Supports exact names and glob patterns (e.g. "subagent*").
    */
   protectedTools?: ProtectedToolsConfig;
+  /**
+   * File path patterns to protect from pruning.
+   * Tool outputs touching files matching these globs are shielded from
+   * automatic and LLM-driven pruning.
+   * Supports glob syntax: double-star, star, question mark.
+   */
+  protectedFilePatterns?: string[];
 }
 export type DcpConfigWithPruneRuleObjects = DcpConfig & {
   rules: PruneRule[];

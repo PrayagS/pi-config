@@ -17,6 +17,7 @@ import {
   resolveToolCallInfo,
 } from "../metadata";
 import { isToolProtected } from "../protected-tools";
+import { getFilePathsFromToolCall, isFilePathProtected } from "../protected-patterns";
 import { getLogger } from "../logger";
 
 export const errorPurgingRule: PruneRule = {
@@ -70,6 +71,16 @@ export const errorPurgingRule: PruneRule = {
     const toolName = (msg.message as any).toolName;
     const protectedList = ctx.config.resolvedProtectedTools?.global ?? [];
     if (toolName && isToolProtected(toolName, protectedList)) return;
+
+    // Skip protected file paths
+    const filePatterns = ctx.config.protectedFilePatterns ?? [];
+    if (filePatterns.length > 0 && msg.message.role === "toolResult") {
+      const info = resolveToolCallInfo(msg, ctx.messages);
+      if (info?.arguments) {
+        const filePaths = getFilePathsFromToolCall(info.toolName, info.arguments);
+        if (isFilePathProtected(filePaths, filePatterns)) return;
+      }
+    }
 
     const currentTurn = ctx.messages[ctx.messages.length - 1]?.metadata.turnIndex ?? 0;
     if (isTurnProtected(msg, currentTurn, ctx.config.turnProtection)) return;

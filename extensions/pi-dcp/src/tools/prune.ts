@@ -8,6 +8,7 @@
 import { Type } from "@sinclair/typebox";
 import type { ToolCacheState } from "../tool-cache";
 import { isToolProtected } from "../protected-tools";
+import { getFilePathsFromToolCall, isFilePathProtected } from "../protected-patterns";
 import { getLogger } from "../logger";
 
 export const pruneToolName = "dcp_prune";
@@ -26,7 +27,8 @@ export const pruneToolParameters = Type.Object({
 export function executePrune(
   state: ToolCacheState,
   params: { ids: string[] },
-  protectedTools: string[] = []
+  protectedTools: string[] = [],
+  protectedFilePatterns: string[] = []
 ): { pruned: number; skipped: string[]; message: string } {
   const logger = getLogger();
   let pruned = 0;
@@ -54,6 +56,15 @@ export function executePrune(
     if (isToolProtected(entry.toolName, protectedTools)) {
       skipped.push(`${idStr} (protected: ${entry.toolName})`);
       continue;
+    }
+
+    // File-path protection
+    if (protectedFilePatterns.length > 0) {
+      const filePaths = getFilePathsFromToolCall(entry.toolName, entry.parameters);
+      if (isFilePathProtected(filePaths, protectedFilePatterns)) {
+        skipped.push(`${idStr} (protected file: ${filePaths.join(", ")})`);
+        continue;
+      }
     }
 
     state.prunedIds.add(callId);
