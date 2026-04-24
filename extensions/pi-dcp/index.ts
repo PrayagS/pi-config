@@ -21,6 +21,9 @@ import { createToggleCommand } from "./src/cmds/toggle";
 import { createRecentCommand } from "./src/cmds/recent";
 import { createInitCommand } from "./src/cmds/init";
 import { createToolsExpandedCommand } from "./src/cmds/tools-expanded";
+import { createCompressionsCommand } from "./src/cmds/compressions";
+import { createDecompressCommand } from "./src/cmds/decompress";
+import { createRecompressCommand } from "./src/cmds/recompress";
 import { dcpLogsCommand } from "./src/cmds/logs";
 import { createContextEventHandler } from "./src/events/context";
 import { createSessionStartEventHandler } from "./src/events/sessionStart";
@@ -121,6 +124,9 @@ export default async function (pi: ExtensionAPI) {
   pi.registerCommand("dcp-debug", createDebugCommand(config));
   pi.registerCommand("dcp-recent", createRecentCommand(config));
   pi.registerCommand("dcp-stats", createStatsCommand(statsTracker, config.rules.length));
+  pi.registerCommand("dcp-compressions", createCompressionsCommand(compressSummaries));
+  pi.registerCommand("dcp-decompress", createDecompressCommand(compressSummaries, toolCacheState));
+  pi.registerCommand("dcp-recompress", createRecompressCommand(compressSummaries, toolCacheState));
   pi.registerCommand("dcp-logs", dcpLogsCommand);
 
   // Register LLM-callable tools
@@ -239,9 +245,34 @@ export default async function (pi: ExtensionAPI) {
           }
         } else if (entry.customType === ENTRY_TYPE_COMPRESS && entry.data) {
           const data = entry.data as { summaries: CompressSummary[] };
-          compressSummaries.push(...data.summaries);
-          for (const cs of data.summaries) {
-            for (const id of cs.compressedIds) toolCacheState.prunedIds.add(id);
+          compressSummaries.length = 0; // Latest entry is the full state
+          for (const s of data.summaries) {
+            // Backwards compat: add defaults for new fields
+            const summary: CompressSummary = {
+              id: s.id ?? 0,
+              anchorCallId: s.anchorCallId,
+              summary: s.summary,
+              compressedIds: s.compressedIds,
+              topic: s.topic ?? "",
+              active: s.active ?? true,
+              deactivatedByUser: s.deactivatedByUser ?? false,
+              deactivatedAt: s.deactivatedAt,
+            };
+            compressSummaries.push(summary);
+          }
+          // Re-assign IDs if missing (legacy data)
+          let maxId = 0;
+          for (const s of compressSummaries) {
+            if (s.id > maxId) maxId = s.id;
+          }
+          for (const s of compressSummaries) {
+            if (s.id === 0) s.id = ++maxId;
+          }
+          // Only add prunedIds from active compressions
+          for (const cs of compressSummaries) {
+            if (cs.active) {
+              for (const id of cs.compressedIds) toolCacheState.prunedIds.add(id);
+            }
           }
         }
       }

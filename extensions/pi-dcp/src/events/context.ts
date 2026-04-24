@@ -175,10 +175,12 @@ function applyLlmDrivenPruning(
   // the latest assistant message to remain completely unmodified.
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant") ?? null;
 
-  // Build anchor map for compress summaries
+  // Build anchor map for active compress summaries only
   const summaryByAnchor = new Map<string, string>();
   for (const cs of compressSummaries) {
-    summaryByAnchor.set(cs.anchorCallId, cs.summary);
+    if (cs.active) {
+      summaryByAnchor.set(cs.anchorCallId, cs.summary);
+    }
   }
 
   const injectedAnchors = new Set<string>();

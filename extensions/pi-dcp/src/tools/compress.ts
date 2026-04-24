@@ -12,12 +12,22 @@ import { getFilePathsFromToolCall, isFilePathProtected } from "../protected-patt
 import { getLogger } from "../logger";
 
 export interface CompressSummary {
+  /** Stable numeric ID for this compression (1-indexed, auto-assigned) */
+  id: number;
   /** Tool call ID where the summary should be anchored */
   anchorCallId: string;
   /** The summary text */
   summary: string;
   /** Tool call IDs that were compressed */
   compressedIds: string[];
+  /** Brief topic label */
+  topic: string;
+  /** Whether this compression is currently active (applied) */
+  active: boolean;
+  /** Whether the user explicitly decompressed this */
+  deactivatedByUser: boolean;
+  /** Timestamp when deactivated (ms epoch) */
+  deactivatedAt?: number;
 }
 
 export const compressToolName = "dcp_compress";
@@ -89,10 +99,19 @@ export function executeCompress(
   // Anchor the summary at the last compressed call ID
   const anchorCallId = compressedIds[compressedIds.length - 1];
 
+  // Assign next available ID
+  const nextId = compressSummaries.length > 0
+    ? Math.max(...compressSummaries.map(s => s.id)) + 1
+    : 1;
+
   compressSummaries.push({
+    id: nextId,
     anchorCallId,
     summary: `[Compressed: ${params.topic}]\n\n${params.summary}`,
     compressedIds,
+    topic: params.topic,
+    active: true,
+    deactivatedByUser: false,
   });
 
   logger.info(
