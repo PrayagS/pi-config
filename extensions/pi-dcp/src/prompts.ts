@@ -110,3 +110,15 @@ export const COOLDOWN_PROMPT = `
 Context management action completed. Continue with your current task.
 </dcp-cooldown>
 `.trim();
+
+/**
+ * Iteration nudge — triggered after many assistant/tool turns without user input.
+ * Stronger than periodic nudge, weaker than compress nudge.
+ */
+export const ITERATION_NUDGE_PROMPT = `
+<dcp-system-reminder>
+You've been iterating for a while after the last user message.
+
+If there is a closed portion that is unlikely to be referenced immediately (for example, finished research before implementation), use the compress tool on it now.
+</dcp-system-reminder>
+`.trim();

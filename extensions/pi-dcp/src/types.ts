@@ -159,6 +159,22 @@ export interface DcpConfig {
   /** Context thresholds for compression nudges */
   contextLimits?: ContextLimits;
   /**
+   * Show a periodic nudge every N context events.
+   * Default: 15
+   */
+  nudgeFrequency?: number;
+  /**
+   * After this many assistant/tool turns without user input,
+   * inject a stronger iteration-aware nudge. Default: 15
+   */
+  iterationNudgeThreshold?: number;
+  /**
+   * Nudge placement strategy:
+   * - 'soft' — nudge appended to last assistant message context (default)
+   * - 'strong' — nudge appended to last user message context
+   */
+  nudgeForce?: 'soft' | 'strong';
+  /**
    * Tool protection configuration.
    * Protected tools are shielded from automatic and LLM-driven pruning.
    * Supports exact names and glob patterns (e.g. "subagent*").

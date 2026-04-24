@@ -101,9 +101,14 @@ export default async function (pi: ExtensionAPI) {
   const compressSummaries: CompressSummary[] = [];
   const lastToolWasDcp = { value: false };
   const nudgeCounter = { value: 0 };
+  const iterationCounter = { value: 0 };
 
   // Config for LLM-driven features
-  const nudgeFrequency = 15;
+  const nudgeFrequency = config.nudgeFrequency ?? 15;
+  const iterationNudgeThreshold = config.iterationNudgeThreshold ?? 15;
+  const nudgeForce: 'soft' | 'strong' = config.nudgeForce ?? 'soft';
+
+  logger.info(`Nudge config: frequency=${nudgeFrequency}, iterationThreshold=${iterationNudgeThreshold}, force=${nudgeForce}`);
   const resolved = resolveProtectedTools(config.protectedTools);
   const protectedTools = resolved.global;
   const compressProtectedTools = resolved.compress;
@@ -206,6 +211,9 @@ export default async function (pi: ExtensionAPI) {
       lastToolWasDcp,
       nudgeCounter,
       nudgeFrequency,
+      iterationCounter,
+      iterationNudgeThreshold,
+      nudgeForce,
       protectedTools,
       protectedFilePatterns,
     })
@@ -259,6 +267,7 @@ export default async function (pi: ExtensionAPI) {
     toolCacheState.distillations.clear();
     compressSummaries.length = 0;
     nudgeCounter.value = 0;
+    iterationCounter.value = 0;
     lastToolWasDcp.value = false;
     logger.info("Session compacted — DCP state reset");
   });

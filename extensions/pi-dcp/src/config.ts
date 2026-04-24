@@ -32,6 +32,9 @@ const DEFAULT_CONFIG: DcpConfigWithRuleRefs = {
   turnProtection: { enabled: true, turns: 3 },
   summaryBuffer: true,
   contextLimits: DEFAULT_CONTEXT_LIMITS,
+  nudgeFrequency: 15,
+  iterationNudgeThreshold: 15,
+  nudgeForce: "soft",
   protectedTools: {
     global: [],
     compress: [],

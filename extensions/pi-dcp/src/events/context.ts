@@ -25,6 +25,7 @@ import {
   COMPRESS_NUDGE_PROMPT,
   DUMB_ZONE_NUDGE_PROMPT,
   COOLDOWN_PROMPT,
+  ITERATION_NUDGE_PROMPT,
 } from "../prompts";
 import { estimateContextTokens } from "../tokens";
 import { getLogger } from "../logger";
@@ -42,6 +43,12 @@ export interface ContextEventHandlerOptions {
   nudgeCounter: { value: number };
   /** Nudge every N turns */
   nudgeFrequency: number;
+  /** Counts assistant/tool turns since last user message */
+  iterationCounter: { value: number };
+  /** Trigger iteration nudge after this many non-user turns */
+  iterationNudgeThreshold: number;
+  /** Nudge placement: 'soft' targets assistant context, 'strong' targets user context */
+  nudgeForce: 'soft' | 'strong';
   /** Protected tool names that can't be pruned */
   protectedTools: string[];
   /** File path patterns that can't be pruned */
@@ -63,6 +70,9 @@ export function createContextEventHandler(options: ContextEventHandlerOptions) {
     lastToolWasDcp,
     nudgeCounter,
     nudgeFrequency,
+    iterationCounter,
+    iterationNudgeThreshold,
+    nudgeForce,
     protectedTools,
   } = options;
 
@@ -84,6 +94,18 @@ export function createContextEventHandler(options: ContextEventHandlerOptions) {
       // Layer 2.5: Final safety net - fix any orphaned tool pairs from layer 2
       messages = repairOrphanedToolPairsPostPruning(messages, logger);
 
+      // Track iteration pressure: count non-user messages since last user message.
+      // If the last message is from the user, reset iteration counter.
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg?.role === "user") {
+        iterationCounter.value = 0;
+      } else {
+        iterationCounter.value++;
+      }
+
+      // Increment nudge counter BEFORE injection check (reset happens when nudge is shown)
+      nudgeCounter.value++;
+
       // Layer 3: Inject prunable-tools list and nudges
       injectContextInfo(
         messages,
@@ -92,6 +114,9 @@ export function createContextEventHandler(options: ContextEventHandlerOptions) {
         lastToolWasDcp,
         nudgeCounter,
         nudgeFrequency,
+        iterationCounter,
+        iterationNudgeThreshold,
+        nudgeForce,
         protectedTools,
         compressSummaries,
         ctx,
@@ -103,8 +128,9 @@ export function createContextEventHandler(options: ContextEventHandlerOptions) {
       statsTracker.totalPruned += prunedCount;
       statsTracker.totalProcessed += originalCount;
 
-      // Increment nudge counter (reset happens when nudge is shown)
-      nudgeCounter.value++;
+      logger.debug(
+        `Counters: nudge=${nudgeCounter.value}/${nudgeFrequency}, iteration=${iterationCounter.value}/${iterationNudgeThreshold}`
+      );
 
       if (config.debug) {
         ctx.ui.notify(`[pi-dcp] Pruned ${prunedCount} / ${originalCount} messages`);
@@ -228,7 +254,8 @@ function applyLlmDrivenPruning(
 }
 
 /**
- * Inject prunable-tools list and nudge prompts into the last user message.
+ * Inject prunable-tools list and nudge prompts into context.
+ * Nudge force determines target: 'strong' → last user message, 'soft' → last assistant message.
  */
 function injectContextInfo(
   messages: AgentMessage[],
@@ -237,6 +264,9 @@ function injectContextInfo(
   lastToolWasDcp: { value: boolean },
   nudgeCounter: { value: number },
   nudgeFrequency: number,
+  iterationCounter: { value: number },
+  iterationNudgeThreshold: number,
+  nudgeForce: 'soft' | 'strong',
   protectedTools: string[],
   compressSummaries: CompressSummary[],
   ctx: ExtensionContext,
@@ -269,6 +299,10 @@ function injectContextInfo(
 
     const isPeriodicNudge = nudgeCounter.value >= nudgeFrequency;
 
+    // Iteration pressure: long agent-only loops get stronger nudges
+    const isIterationNudge =
+      iterationNudgeThreshold > 0 && iterationCounter.value >= iterationNudgeThreshold;
+
     // Check dumb-zone signal (optional — only fires if pi-dumb-zone is loaded)
     const dumbZoneSignal = readDumbZoneSignal();
     const isDumbZoneNudge =
@@ -276,7 +310,10 @@ function injectContextInfo(
       (dumbZoneSignal.severity === "danger" || dumbZoneSignal.severity === "critical");
 
     // Show prunable-tools list + nudge when any trigger fires
-    if (adjustedOverMax || adjustedOverMin || isPeriodicNudge || isDumbZoneNudge) {
+    if (adjustedOverMax || adjustedOverMin || isIterationNudge || isPeriodicNudge || isDumbZoneNudge) {
+      logger.debug(
+        `Nudge triggered: overMax=${adjustedOverMax}, overMin=${adjustedOverMin}, iteration=${isIterationNudge}, periodic=${isPeriodicNudge}, dumbZone=${isDumbZoneNudge}`
+      );
       const entries = getPrunableEntries(state, protectedTools, 5, config.turnProtection, config.protectedFilePatterns ?? []);
       const prunableList = buildPrunableToolsList(entries);
       if (prunableList) {
@@ -309,6 +346,11 @@ function injectContextInfo(
               ? ` (+ ${summaryTokenExtension} summary buffer)`
               : ``)
         );
+      } else if (isIterationNudge) {
+        parts.push(ITERATION_NUDGE_PROMPT);
+        logger.info(
+          `Iteration nudge: ${iterationCounter.value} turns without user input (threshold: ${iterationNudgeThreshold})`
+        );
       } else {
         parts.push(NUDGE_PROMPT);
       }
@@ -320,16 +362,48 @@ function injectContextInfo(
 
   const combined = parts.join("\n\n");
 
-  // Find last user message and append
+  // Injection target priority:
+  // 1. Last toolResult message (most visible during tool-use loops)
+  // 2. Last user message (fallback for first turn or non-tool flows)
+  // nudgeForce only matters when neither toolResult exists:
+  //   'strong' → user message, 'soft' → assistant message
+  const appendToMessage = (msg: any) => {
+    if (typeof msg.content === "string") {
+      msg.content = msg.content + "\n\n" + combined;
+    } else if (Array.isArray(msg.content)) {
+      msg.content = [...msg.content, { type: "text", text: combined }];
+    }
+  };
+
+  // Try last toolResult first (highest visibility in tool loops)
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i] as any;
-    if (msg.role === "user") {
-      if (typeof msg.content === "string") {
-        msg.content = msg.content + "\n\n" + combined;
-      } else if (Array.isArray(msg.content)) {
-        msg.content = [...msg.content, { type: "text", text: combined }];
-      }
+    if (msg.role === "toolResult") {
+      appendToMessage(msg);
       return;
+    }
+  }
+
+  // No toolResult — fall back based on nudgeForce
+  const targetRole = nudgeForce === 'soft' ? 'assistant' : 'user';
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i] as any;
+    if (msg.role === targetRole) {
+      if (targetRole === 'assistant' && hasThinkingBlocks(msg)) continue;
+      appendToMessage(msg);
+      return;
+    }
+  }
+
+  // Final fallback: last user message
+  if (targetRole !== 'user') {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i] as any;
+      if (msg.role === "user") {
+        appendToMessage(msg);
+        return;
+      }
     }
   }
 }
