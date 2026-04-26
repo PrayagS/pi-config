@@ -51,64 +51,46 @@ The LLM can call these tools to manage context proactively:
 
 ## Configuration
 
-Create `dcp.config.ts` in your project root or `~/.dcprc` for global config:
+Pure JSON config. Two locations:
 
-```typescript
-import type { DcpConfig } from "~/.pi/agent/extensions/pi-dcp/src/types";
+- **Project**: `.pi/pi-dcp.json` (highest priority)
+- **Global**: `~/.pi/agent/pi-dcp.json`
 
-export default {
-  enabled: true,
-  debug: false,
+Project config overrides global. Both override defaults.
 
-  // Rules to apply (in order)
-  rules: [
+```json
+{
+  "enabled": true,
+  "debug": false,
+  "rules": [
     "deduplication",
     "superseded-writes",
     "error-purging",
     "tool-pairing",
     "recency"
   ],
-
-  // Always keep last N messages (recency rule)
-  keepRecentCount: 10,
-
-  // Protect tool outputs from the last N agent turns
-  turnProtection: { enabled: true, turns: 3 },
-
-  // Context thresholds for compression nudges
-  contextLimits: {
-    min: 80_000,      // Soft threshold: gentle nudge
-    max: 120_000,     // Hard threshold: urgent nudge
-    // Per-model overrides (supports percentage strings)
-    modelMin: { "claude-3-haiku": 40_000 },
-    modelMax: { "claude-3-haiku": "60%" },
+  "keepRecentCount": 10,
+  "turnProtection": { "enabled": true, "turns": 3 },
+  "contextLimits": {
+    "min": 80000,
+    "max": 120000,
+    "modelMin": { "claude-3-haiku": 40000 },
+    "modelMax": { "claude-3-haiku": "60%" }
   },
-
-  // Nudge every N context events
-  nudgeFrequency: 15,
-
-  // Iteration nudge after N turns without user input
-  iterationNudgeThreshold: 15,
-
-  // Nudge placement: 'soft' → assistant context, 'strong' → user context
-  nudgeForce: "soft",
-
-  // Extend context limit by active summary tokens (prevents over-nudging)
-  summaryBuffer: true,
-
-  // Protected tools (merged with built-in defaults, supports globs)
-  protectedTools: {
-    global: ["my_custom_tool"],     // Protected from ALL pruning
-    compress: ["important_tool"],   // Additional protection during compression
+  "nudgeFrequency": 15,
+  "iterationNudgeThreshold": 15,
+  "nudgeForce": "soft",
+  "summaryBuffer": true,
+  "protectedTools": {
+    "global": ["my_custom_tool"],
+    "compress": ["important_tool"]
   },
-
-  // Protected file patterns (glob syntax)
-  protectedFilePatterns: [
+  "protectedFilePatterns": [
     "**/PLAN.md",
     "**/migrations/**",
-    ".env*",
-  ],
-} satisfies DcpConfig;
+    ".env*"
+  ]
+}
 ```
 
 ### Configuration Options
@@ -154,7 +136,7 @@ These tools are protected by default:
 | `/dcp-debug` | Toggle debug logging |
 | `/dcp-stats` | Show pruning statistics for current session |
 | `/dcp-recent <N>` | Set how many recent messages to always keep |
-| `/dcp-init` | Generate a `dcp.config.ts` file in current directory |
+| `/dcp-init` | Generate `.pi/pi-dcp.json` (use `--global` for global config) |
 | `/dcp-tools [on\|off]` | Toggle tool output expansion in UI |
 | `/dcp-compressions` | List all compression summaries with status |
 | `/dcp-decompress <id>` | Restore a compression (show original tool outputs) |
@@ -309,7 +291,7 @@ Every `tool_use` must have a matching `tool_result`. DCP ensures this via:
 pi-dcp/
 ├── index.ts                 # Extension entry point
 ├── src/
-│   ├── config.ts           # Configuration loading (bunfig)
+│   ├── config.ts           # Configuration loading (JSON)
 │   ├── types.ts            # Type definitions
 │   ├── workflow.ts         # Prepare > Process > Filter engine
 │   ├── metadata.ts         # Message metadata + turn protection

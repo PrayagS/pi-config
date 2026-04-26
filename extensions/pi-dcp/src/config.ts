@@ -1,7 +1,15 @@
 /**
- * Configuration management using bunfig
+ * Configuration management - pure JSON
+ *
+ * Loads from:
+ * 1. .pi/pi-dcp.json (project-level, highest priority)
+ * 2. ~/.pi/agent/pi-dcp.json (global)
+ * 3. Defaults
  */
 
+import { homedir } from "os";
+import { join } from "path";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
   DcpConfigWithPruneRuleObjects,
@@ -16,10 +24,15 @@ import {
   COMPRESS_PROTECTED_TOOLS,
   mergeProtectedTools,
 } from "./protected-tools";
-import { loadConfig as bunfigLoad } from "bunfig";
 import { getRule, getRuleNames } from "./registry";
 import { getLogger } from "./logger";
 import { DEFAULT_CONTEXT_LIMITS, validateContextLimits } from "./context-limits";
+
+/** Global config path: ~/.pi/agent/pi-dcp.json */
+const GLOBAL_CONFIG_PATH = join(homedir(), ".pi", "agent", "pi-dcp.json");
+
+/** Project config path: .pi/pi-dcp.json (relative to cwd) */
+const PROJECT_CONFIG_NAME = ".pi/pi-dcp.json";
 
 /**
  * Default configuration
@@ -43,51 +56,79 @@ const DEFAULT_CONFIG: DcpConfigWithRuleRefs = {
 };
 
 /**
- * Load configuration from extension settings, files, or defaults
+ * Deep merge two objects (source wins over target for conflicts)
+ */
+function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>): T {
+  const result = { ...target };
+
+  for (const key of Object.keys(source) as (keyof T)[]) {
+    const sourceVal = source[key];
+    const targetVal = target[key];
+
+    if (sourceVal === undefined) continue;
+
+    if (
+      typeof sourceVal === "object" &&
+      sourceVal !== null &&
+      !Array.isArray(sourceVal) &&
+      typeof targetVal === "object" &&
+      targetVal !== null &&
+      !Array.isArray(targetVal)
+    ) {
+      // Recursively merge objects
+      result[key] = deepMerge(targetVal, sourceVal);
+    } else {
+      // Override with source value (including arrays)
+      result[key] = sourceVal as T[keyof T];
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Load JSON config from a path, returns null if not found or invalid
+ */
+function loadJsonConfig(path: string): Partial<DcpConfigWithRuleRefs> | null {
+  if (!existsSync(path)) return null;
+
+  try {
+    const content = readFileSync(path, "utf-8");
+    return JSON.parse(content);
+  } catch (e) {
+    getLogger().warn(`Failed to parse config at ${path}: ${e instanceof Error ? e.message : e}`);
+    return null;
+  }
+}
+
+/**
+ * Load configuration from JSON files
+ *
  * Priority (highest to lowest):
  * 1. CLI flags (--dcp-enabled, --dcp-debug)
- * 2. Config file in current directory (dcp.config.ts, etc.)
- * 3. Config file in home directory (~/.dcprc)
+ * 2. Project config (.pi/pi-dcp.json)
+ * 3. Global config (~/.pi/agent/pi-dcp.json)
  * 4. Default configuration
  */
 export async function loadConfig(pi: ExtensionAPI): Promise<DcpConfigWithPruneRuleObjects> {
-  // bunfig automatically searches for config files in cwd and home directory
-  // It supports: dcp.config.{ts,js,json,toml,yaml}, .dcprc{,.json,.toml,.yaml}
-  // and package.json with "dcp" key
-  const config = await bunfigLoad<DcpConfigWithRuleRefs>({
-    name: "pi-dcp",
-    cwd: process.cwd(),
-    defaultConfig: DEFAULT_CONFIG,
-    checkEnv: true, // Allow DCP_ENABLED, DCP_DEBUG, etc.
-  });
+  const projectConfigPath = join(process.cwd(), PROJECT_CONFIG_NAME);
+
+  // Load configs (project overrides global overrides defaults)
+  const globalConfig = loadJsonConfig(GLOBAL_CONFIG_PATH);
+  const projectConfig = loadJsonConfig(projectConfigPath);
+
+  // Merge: defaults <- global <- project
+  let config: DcpConfigWithRuleRefs = { ...DEFAULT_CONFIG };
+  if (globalConfig) {
+    config = deepMerge(config, globalConfig);
+  }
+  if (projectConfig) {
+    config = deepMerge(config, projectConfig);
+  }
 
   // Apply flag overrides (highest priority)
   const enabled = pi.getFlag("--dcp-enabled");
   const debug = pi.getFlag("--dcp-debug");
-
-  // Filter out invalid rules
-  const availableRuleNames = getRuleNames();
-
-  const invalidRuleNames: string[] = [];
-
-  const rules: PruneRule[] = config.rules
-    .filter((rule) => {
-      if (isPruneRuleObject(rule)) {
-        return true; // Keep non-string rules (custom rule objects)
-      }
-      if (typeof rule === "string" && availableRuleNames.includes(rule)) {
-        return true; // Valid rule name
-      }
-      invalidRuleNames.push(typeof rule === "string" ? rule : JSON.stringify(rule));
-      return false; // Remove invalid rule names
-    })
-    .map((rule) => {
-      if (typeof rule === "string") {
-        return getRule(rule)!; // Non-null due to filtering above
-      }
-      return rule;
-      // convert string rule name to rule object
-    });
 
   if (enabled !== undefined) {
     config.enabled = enabled as boolean;
@@ -96,17 +137,38 @@ export async function loadConfig(pi: ExtensionAPI): Promise<DcpConfigWithPruneRu
     config.debug = debug as boolean;
   }
 
-  // Log invalid rules if debug is enabled
+  // Filter out invalid rules
+  const availableRuleNames = getRuleNames();
+  const invalidRuleNames: string[] = [];
+
+  const rules: PruneRule[] = config.rules
+    .filter((rule) => {
+      if (isPruneRuleObject(rule)) {
+        return true;
+      }
+      if (typeof rule === "string" && availableRuleNames.includes(rule)) {
+        return true;
+      }
+      invalidRuleNames.push(typeof rule === "string" ? rule : JSON.stringify(rule));
+      return false;
+    })
+    .map((rule) => {
+      if (typeof rule === "string") {
+        return getRule(rule)!;
+      }
+      return rule;
+    });
+
   if (config.debug && invalidRuleNames.length > 0) {
     getLogger().warn(
-      `The following configured rules are invalid and will be ignored: ${invalidRuleNames.join(", ")}`
+      `Invalid rules ignored: ${invalidRuleNames.join(", ")}`
     );
   }
 
   // Validate contextLimits
   const limitErrors = validateContextLimits(config.contextLimits);
   if (limitErrors.length > 0) {
-    getLogger().warn(`Invalid contextLimits config, using defaults: ${limitErrors.join("; ")}`);
+    getLogger().warn(`Invalid contextLimits, using defaults: ${limitErrors.join("; ")}`);
     config.contextLimits = DEFAULT_CONTEXT_LIMITS;
   }
 
@@ -117,19 +179,14 @@ export async function loadConfig(pi: ExtensionAPI): Promise<DcpConfigWithPruneRu
 }
 
 /**
- * Get default configuration (useful for testing or displaying defaults)
+ * Get default configuration
  */
 export function getDefaultConfig(): DcpConfig {
   return { ...DEFAULT_CONFIG };
 }
 
 /**
- * Resolve the effective protected tool lists from config.
- * Merges user config with built-in defaults.
- *
- * Returns:
- * - `global` — applies to all pruning (auto rules + LLM tools)
- * - `compress` — additional tools protected during compression (merged with global)
+ * Resolve protected tool lists from config (merges with built-in defaults)
  */
 export function resolveProtectedTools(userConfig?: ProtectedToolsConfig): {
   global: string[];
@@ -145,124 +202,80 @@ export function resolveProtectedTools(userConfig?: ProtectedToolsConfig): {
 }
 
 /**
- * Resolve the effective protected file patterns from config.
- * Returns deduplicated array.
+ * Resolve protected file patterns from config
  */
 export function resolveProtectedFilePatterns(userPatterns?: string[]): string[] {
   return userPatterns && userPatterns.length > 0 ? [...new Set(userPatterns)] : [];
 }
 
 /**
- * Generate sample configuration file content
- * Used by the init command to create dcp.config.ts
+ * Generate JSON config content
  */
 export function generateConfigFileContent(options?: { simplified?: boolean }): string {
   const simplified = options?.simplified ?? false;
 
   if (simplified) {
-    return `/**
- * DCP (Dynamic Context Pruning) Configuration
- * 
- * Place this file as:
- * - ./dcp.config.ts (project-specific)
- * - ~/.dcprc (user-wide)
- */
-
-import type { DcpConfig } from "~/.pi/agent/extensions/pi-dcp/src/types";
-
-export default {
-	enabled: true,
-	debug: false,
-	rules: ["deduplication", "superseded-writes", "error-purging", "tool-pairing", "recency"],
-	keepRecentCount: 10,
-} satisfies DcpConfig;
-`;
+    const config = {
+      enabled: true,
+      debug: false,
+      rules: ["deduplication", "superseded-writes", "error-purging", "tool-pairing", "recency"],
+      keepRecentCount: 10,
+    };
+    return JSON.stringify(config, null, 2) + "\n";
   }
 
-  return `/**
- * DCP (Dynamic Context Pruning) Configuration
- * 
- * This file configures the pi-dcp extension for intelligent context pruning.
- * 
- * Place this file as:
- * - ./dcp.config.ts (project-specific configuration)
- * - ~/.dcprc (user-wide configuration)
- * 
- * All fields are optional - defaults will be used for missing values.
- */
-
-import type { DcpConfig } from "~/.pi/agent/extensions/pi-dcp/src/types";
-
-export default {
-	// Enable/disable DCP entirely
-	enabled: true,
-
-	// Enable debug logging to see what gets pruned
-	debug: false,
-
-	// Rules to apply (in order of execution)
-	// Available built-in rules:
-	// - "deduplication": Remove duplicate tool outputs
-	// - "superseded-writes": Remove older file versions
-	// - "error-purging": Remove resolved errors
-	// - "tool-pairing": Preserve tool_use/tool_result pairing (CRITICAL)
-	// - "recency": Always keep recent messages
-	rules: [
-		"deduplication",
-		"superseded-writes",
-		"error-purging",
-		"tool-pairing",
-		"recency",
-	],
-
-	// Number of recent messages to always keep (for recency rule)
-	keepRecentCount: 10,
-
-	// Protected tools — shielded from pruning. Supports globs (e.g. "subagent*")
-	// Built-in defaults: dcp_*, todo, subagent*, context_*, plannotator_submit_plan
-	// protectedTools: {
-	//   global: [],       // Additional tools protected from ALL pruning
-	//   compress: [],     // Additional tools protected from compression only
-	// },
-
-	// Protected file patterns — file-related tool outputs matching these globs
-	// are shielded from pruning. Supports **, *, ? glob syntax.
-	// protectedFilePatterns: [
-	//   "**/PLAN.md",
-	//   "**/migrations/**",
-	//   ".env*",
-	// ],
-} satisfies DcpConfig;
-`;
+  const config = {
+    enabled: true,
+    debug: false,
+    rules: ["deduplication", "superseded-writes", "error-purging", "tool-pairing", "recency"],
+    keepRecentCount: 10,
+    turnProtection: { enabled: true, turns: 3 },
+    contextLimits: {
+      min: 80000,
+      max: 120000,
+    },
+    nudgeFrequency: 15,
+    iterationNudgeThreshold: 15,
+    nudgeForce: "soft",
+    summaryBuffer: true,
+    protectedTools: {
+      global: [],
+      compress: [],
+    },
+    protectedFilePatterns: [],
+  };
+  return JSON.stringify(config, null, 2) + "\n";
 }
 
 /**
- * Write configuration file to the specified path
+ * Write configuration file
  *
  * @param path - Full path where to write the config file
  * @param options - Options for file generation
- * @returns Promise that resolves when file is written
  */
 export async function writeConfigFile(
   path: string,
   options?: { force?: boolean; simplified?: boolean }
 ): Promise<void> {
-  const fs = await import("fs/promises");
   const force = options?.force ?? false;
 
   // Check if file already exists
-  if (!force) {
-    try {
-      await fs.access(path);
-      throw new Error("Config file already exists. Use force option to overwrite.");
-    } catch (error: any) {
-      if (error.code !== "ENOENT") {
-        throw error;
-      }
-      // File doesn't exist, proceed
-    }
+  if (!force && existsSync(path)) {
+    throw new Error("Config file already exists. Use force option to overwrite.");
+  }
+
+  // Ensure parent directory exists
+  const dir = path.substring(0, path.lastIndexOf("/"));
+  if (dir && !existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
   }
 
   const content = generateConfigFileContent(options);
-  await fs.writeFile(path, content, "utf-8");
+  writeFileSync(path, content, "utf-8");
 }
+
+/** Export paths for use by init command */
+export const CONFIG_PATHS = {
+  global: GLOBAL_CONFIG_PATH,
+  projectRelative: PROJECT_CONFIG_NAME,
+};

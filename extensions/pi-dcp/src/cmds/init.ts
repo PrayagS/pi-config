@@ -1,32 +1,38 @@
 /**
  * DCP Init Command
  *
- * Generate a default dcp.config.ts file in the current directory.
+ * Generate pi-dcp.json config file (project or global).
  */
 
-import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
-import { writeConfigFile } from "../config";
 import { join } from "path";
+import { writeConfigFile, CONFIG_PATHS } from "../config";
 import { CommandDefinition } from "../types";
 
 export function createInitCommand(): CommandDefinition {
   return {
-    description: "Generate a default dcp.config.ts file in the current directory",
+    description: "Generate pi-dcp.json config (use --global for ~/.pi/agent/pi-dcp.json)",
     handler: async (args, ctx) => {
-      const configPath = join(process.cwd(), "dcp.config.ts");
-      const force = args?.toLowerCase() === "--force";
+      const argList = args?.split(/\s+/) ?? [];
+      const isGlobal = argList.includes("--global");
+      const force = argList.includes("--force");
+
+      const configPath = isGlobal
+        ? CONFIG_PATHS.global
+        : join(process.cwd(), CONFIG_PATHS.projectRelative);
+
+      const location = isGlobal ? "global" : "project";
 
       try {
         await writeConfigFile(configPath, { force });
-        ctx.ui.notify(`Config file created: ${configPath}`, "info");
+        ctx.ui.notify(`DCP ${location} config created: ${configPath}`, "info");
       } catch (error: any) {
         if (error.message?.includes("already exists")) {
           ctx.ui.notify(
-            "Config file already exists. Use '/dcp-init --force' to overwrite.",
+            `Config already exists at ${configPath}. Use '/dcp-init --force' to overwrite.`,
             "warning"
           );
         } else {
-          ctx.ui.notify(`Failed to create config file: ${error.message || error}`, "error");
+          ctx.ui.notify(`Failed to create config: ${error.message || error}`, "error");
         }
       }
     },
