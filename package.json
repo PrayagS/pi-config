@@ -25,6 +25,7 @@
       "./extensions/custom-provider-bedrock-inference-profiles/index.ts",
       "./extensions/fetch-url/index.ts",
       "./extensions/interactive-shell/index.ts",
+      "./extensions/prompt-history/index.ts",
       "./extensions/notify/index.ts",
       "./extensions/pi-co-authored-by/index.ts",
       "./extensions/pi-footer/index.ts",
