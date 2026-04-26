@@ -27,6 +27,7 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/interactive-shell/` — interactive shell integration
 - `extensions/notify/` — notifications
 - `extensions/pi-co-authored-by/` — append AI trailers to git/jj commits
+- `extensions/pi-dcp/` — dynamic context pruning (automatic rules + LLM tools)
 - `extensions/pi-footer/` — footer/status UI tweaks
 - `extensions/questionnaire/` — structured question UI tool
 - `extensions/sandbox/` — command sandboxing
