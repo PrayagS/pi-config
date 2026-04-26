@@ -387,6 +387,13 @@ Debug mode (`/dcp-debug`):
 [pi-dcp] Nudge triggered: overMax=false, overMin=true, iteration=false, periodic=true, dumbZone=false
 ```
 
+## Credits
+
+Inspired by and built upon:
+
+- [opencode-dynamic-context-pruning](https://github.com/AaronFriel/opencode-dynamic-context-pruning) — original DCP concept for opencode
+- [Edmund Miller's pi-dcp](https://github.com/edmundmiller/dotfiles/tree/main/pi-packages/pi-dcp) — early pi port and experimentation
+
 ## License
 
 MIT
