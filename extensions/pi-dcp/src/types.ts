@@ -204,13 +204,3 @@ export type DcpConfigWithRuleRefs = DcpConfig & {
 };
 
 export type CommandDefinition = Parameters<ExtensionAPI["registerCommand"]>[1];
-
-/**
- * Stats tracker for pruning statistics
- */
-export interface StatsTracker {
-  /** Total messages pruned */
-  totalPruned: number;
-  /** Total messages processed */
-  totalProcessed: number;
-}
