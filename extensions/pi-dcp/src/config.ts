@@ -16,7 +16,6 @@ import {
   DcpConfigWithRuleRefs,
   PruneRule,
   isPruneRuleObject,
-  type DcpConfig,
   type ProtectedToolsConfig,
 } from "./types";
 import {
@@ -179,13 +178,6 @@ export async function loadConfig(pi: ExtensionAPI): Promise<DcpConfigWithPruneRu
 }
 
 /**
- * Get default configuration
- */
-export function getDefaultConfig(): DcpConfig {
-  return { ...DEFAULT_CONFIG };
-}
-
-/**
  * Resolve protected tool lists from config (merges with built-in defaults)
  */
 export function resolveProtectedTools(userConfig?: ProtectedToolsConfig): {
@@ -199,13 +191,6 @@ export function resolveProtectedTools(userConfig?: ProtectedToolsConfig): {
   const compressList = mergeProtectedTools(globalList, COMPRESS_PROTECTED_TOOLS, userCompress);
 
   return { global: globalList, compress: compressList };
-}
-
-/**
- * Resolve protected file patterns from config
- */
-export function resolveProtectedFilePatterns(userPatterns?: string[]): string[] {
-  return userPatterns && userPatterns.length > 0 ? [...new Set(userPatterns)] : [];
 }
 
 /**

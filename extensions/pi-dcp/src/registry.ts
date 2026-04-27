@@ -65,13 +65,6 @@ export function resolveRule(ruleRef: string | PruneRule): PruneRule {
 }
 
 /**
- * Get all registered rules
- */
-export function getAllRules(): PruneRule[] {
-  return Array.from(ruleRegistry.values());
-}
-
-/**
  * Get all registered rule names
  */
 export function getRuleNames(): string[] {

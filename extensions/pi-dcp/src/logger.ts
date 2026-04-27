@@ -206,10 +206,3 @@ export function getLogger(config?: LoggerConfig): Logger {
   }
   return loggerInstance;
 }
-
-/**
- * Reset the logger instance (useful for testing)
- */
-export function resetLogger(): void {
-  loggerInstance = null;
-}

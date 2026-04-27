@@ -5,13 +5,8 @@
  * Applies pruning workflow to reduce token usage while preserving coherence.
  */
 
-import type {
-  SessionStartEvent,
-  ExtensionContext,
-  SessionSwitchEvent,
-} from "@mariozechner/pi-coding-agent";
+import type { SessionStartEvent, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { DcpConfigWithPruneRuleObjects } from "../types";
-import { getAllRules } from "../registry";
 
 export interface SessionStartEventHandlerOptions {
   config: DcpConfigWithPruneRuleObjects;
@@ -31,13 +26,5 @@ export function createSessionStartEventHandler(options: SessionStartEventHandler
       `DCP: Active with ${config.rules.length} rules \n${config.rules.map((r) => `\t- ${r.name}`).join("\n")}`,
       "info"
     );
-  };
-}
-
-export function createSessionSwitchEventHandler(options: SessionStartEventHandlerOptions) {
-  const { config } = options;
-
-  return (event: SessionSwitchEvent, ctx: ExtensionContext) => {
-    ctx.ui.notify(`DCP: Switched to session [${event.reason}]`, "info");
   };
 }

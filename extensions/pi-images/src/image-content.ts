@@ -1,7 +1,6 @@
 import fs from "node:fs";
-import fsp from "node:fs/promises";
 import type { ImageContent } from "./content.ts";
-import { inferMimeType, looksLikeImagePath, looksLikeImagePathAsync } from "./path-utils.ts";
+import { inferMimeType, looksLikeImagePath } from "./path-utils.ts";
 import { debugLog } from "./debug.ts";
 
 export type ImageResizer = (image: ImageContent) => Promise<ImageContent>;
@@ -33,39 +32,6 @@ export function readImageContentFromPath(filePath: string): ImageContent | null 
 	const mimeType = inferMimeType(filePath)!;
 	try {
 		const bytes = fs.readFileSync(filePath);
-		return {
-			type: "image",
-			data: bytes.toString("base64"),
-			mimeType,
-		};
-	} catch (err) {
-		debugLog(`Failed to read image file ${filePath}`, err);
-		return null;
-	}
-}
-
-/**
- * Async image read — non-blocking, preferred where possible.
- */
-export async function readImageContentFromPathAsync(filePath: string): Promise<ImageContent | null> {
-	if (!(await looksLikeImagePathAsync(filePath))) return null;
-
-	try {
-		const stat = await fsp.stat(filePath);
-		if (stat.size > MAX_IMAGE_FILE_SIZE) {
-			debugLog(
-				`Skipping image ${filePath}: file size ${(stat.size / 1024 / 1024).toFixed(1)}MB exceeds ${MAX_IMAGE_FILE_SIZE / 1024 / 1024}MB limit`,
-			);
-			return null;
-		}
-	} catch (err) {
-		debugLog(`Failed to stat image file ${filePath}`, err);
-		return null;
-	}
-
-	const mimeType = inferMimeType(filePath)!;
-	try {
-		const bytes = await fsp.readFile(filePath);
 		return {
 			type: "image",
 			data: bytes.toString("base64"),

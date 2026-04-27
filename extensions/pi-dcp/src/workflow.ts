@@ -259,30 +259,3 @@ function logPruningResults(
     });
   }
 }
-
-/**
- * Get pruning statistics (for future /dcp-stats command)
- */
-export interface PruningStats {
-  totalMessages: number;
-  prunedCount: number;
-  keptCount: number;
-  pruneReasons: Record<string, number>;
-}
-
-export function getPruningStats(withMetadata: MessageWithMetadata[]): PruningStats {
-  const pruned = withMetadata.filter((m) => m.metadata.shouldPrune);
-  const pruneReasons: Record<string, number> = {};
-
-  pruned.forEach((msg) => {
-    const reason = msg.metadata.pruneReason || "unknown";
-    pruneReasons[reason] = (pruneReasons[reason] || 0) + 1;
-  });
-
-  return {
-    totalMessages: withMetadata.length,
-    prunedCount: pruned.length,
-    keptCount: withMetadata.length - pruned.length,
-    pruneReasons,
-  };
-}

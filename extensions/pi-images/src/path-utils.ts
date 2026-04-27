@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,18 +75,6 @@ export function inferMimeType(filePath: string): string | null {
 export function looksLikeImagePath(filePath: string): boolean {
 	const mimeType = inferMimeType(filePath);
 	return mimeType !== null && fs.existsSync(filePath) && fs.statSync(filePath).isFile();
-}
-
-/** Async version — preferred in non-blocking paths. */
-export async function looksLikeImagePathAsync(filePath: string): Promise<boolean> {
-	const mimeType = inferMimeType(filePath);
-	if (!mimeType) return false;
-	try {
-		const stat = await fsp.stat(filePath);
-		return stat.isFile();
-	} catch {
-		return false;
-	}
 }
 
 export function isClipboardTempFile(filePath: string): boolean {
