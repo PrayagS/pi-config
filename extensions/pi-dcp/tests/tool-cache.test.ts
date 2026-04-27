@@ -228,6 +228,73 @@ describe("Tool Cache", () => {
   });
 });
 
+describe("CM-masked entries", () => {
+  test("syncToolCache marks CM-masked results and updates token count", () => {
+    const state = createToolCacheState();
+    const rawMessages: AgentMessage[] = [
+      assistant("reading", [{ id: "toolu_A", name: "read", args: { path: "src/big-file.ts" } }]),
+      toolResult("toolu_A", "read", "x".repeat(500)), // 500 chars
+      assistant("running", [{ id: "toolu_B", name: "bash", args: { command: "git status" } }]),
+      toolResult("toolu_B", "bash", "On branch main\nnothing to commit"),
+    ];
+
+    // First sync — raw content, not masked
+    syncToolCache(state, rawMessages);
+    expect(state.cache.get("toolu_A")!.maskedByCm).toBe(false);
+    expect(state.cache.get("toolu_B")!.maskedByCm).toBe(false);
+    const origTokensA = state.cache.get("toolu_A")!.tokenCount;
+    expect(origTokensA).toBeGreaterThan(10);
+
+    // Simulate CM masking (as would happen on context event)
+    const maskedMessages: AgentMessage[] = [
+      rawMessages[0],
+      toolResult("toolu_A", "read", "[cm-masked read] src/big-file.ts (15 lines, 500B)"),
+      rawMessages[2],
+      toolResult("toolu_B", "bash", "[cm-masked bash] git status"),
+    ];
+
+    // Re-sync with masked content
+    syncToolCache(state, maskedMessages);
+    expect(state.cache.get("toolu_A")!.maskedByCm).toBe(true);
+    expect(state.cache.get("toolu_B")!.maskedByCm).toBe(true);
+
+    // Token counts should now reflect the tiny placeholder, not original
+    expect(state.cache.get("toolu_A")!.tokenCount).toBeLessThan(origTokensA);
+    expect(state.cache.get("toolu_A")!.tokenCount).toBeLessThan(30);
+
+    // No duplicates in idList
+    expect(state.idList.length).toBe(2);
+  });
+
+  test("getPrunableEntries excludes CM-masked entries", () => {
+    const state = createToolCacheState();
+    const messages: AgentMessage[] = [
+      assistant("a", [{ id: "toolu_A", name: "read", args: { path: "a.txt" } }]),
+      toolResult("toolu_A", "read", "[cm-masked read] a.txt (10 lines, 200B)"),
+      assistant("b", [{ id: "toolu_B", name: "read", args: { path: "b.txt" } }]),
+      toolResult("toolu_B", "read", "real file content here that should be prunable"),
+    ];
+
+    syncToolCache(state, messages);
+
+    const entries = getPrunableEntries(state, [], 0);
+    // Only toolu_B should appear — toolu_A is CM-masked
+    expect(entries.length).toBe(1);
+    expect(entries[0].entry.callId).toBe("toolu_B");
+  });
+
+  test("detects legacy [masked ...] prefix", () => {
+    const state = createToolCacheState();
+    const messages: AgentMessage[] = [
+      assistant("a", [{ id: "toolu_A", name: "bash", args: { command: "git diff" } }]),
+      toolResult("toolu_A", "bash", "[masked bash] git diff"),
+    ];
+
+    syncToolCache(state, messages);
+    expect(state.cache.get("toolu_A")!.maskedByCm).toBe(true);
+  });
+});
+
 describe("extractParamKey", () => {
   test("extracts path for file operations", () => {
     expect(extractParamKey("read", { path: "src/index.ts" })).toBe("src/index.ts");

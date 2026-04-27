@@ -7,6 +7,7 @@
 
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { countTokens, extractMessageText } from "./tokens";
+import { isMaskedByCondensedMilk } from "./cm-compat";
 import { isToolProtected } from "./protected-tools";
 import { getFilePathsFromToolCall, isFilePathProtected } from "./protected-patterns";
 
@@ -25,6 +26,8 @@ export interface ToolCacheEntry {
   paramKey: string;
   /** Agent turn this tool call belongs to (0-indexed) */
   turn: number;
+  /** True if condensed-milk has already masked this result */
+  maskedByCm: boolean;
 }
 
 export interface ToolCacheState {
@@ -82,15 +85,28 @@ export function syncToolCache(
     for (const block of msg.content) {
       if (!block || block.type !== "toolCall" || !block.id) continue;
 
-      // Skip if already cached
-      if (state.cache.has(block.id)) continue;
-
       const toolName = block.name || "unknown";
       const parameters = block.arguments || {};
       const result = resultMap.get(block.id);
 
-      const tokenCount = result ? countTokens(extractMessageText(result)) : 0;
+      // Re-count tokens from current content on every sync.
+      // When condensed-milk masks a result after initial cache,
+      // the stored tokenCount would be stale (original size vs
+      // ~15-token placeholder). Recounting keeps the prunable-tools
+      // list accurate so the LLM doesn't waste DCP calls on
+      // already-compressed entries.
+      const resultText = result ? extractMessageText(result) : "";
+      const masked = isMaskedByCondensedMilk(resultText);
+      const tokenCount = resultText ? countTokens(resultText) : 0;
       const isError = result ? !!(result as any).isError : false;
+
+      if (state.cache.has(block.id)) {
+        // Update token count (may have changed due to CM masking)
+        const existing = state.cache.get(block.id)!;
+        existing.tokenCount = tokenCount;
+        existing.maskedByCm = masked;
+        continue;
+      }
 
       const entry: ToolCacheEntry = {
         callId: block.id,
@@ -98,6 +114,7 @@ export function syncToolCache(
         parameters,
         tokenCount,
         isError,
+        maskedByCm: masked,
         paramKey: extractParamKey(toolName, parameters),
         turn: turnCounter,
       };
@@ -168,6 +185,11 @@ export function getPrunableEntries(
     const entry = state.cache.get(callId);
     if (!entry) continue;
     if (isToolProtected(entry.toolName, protectedTools)) continue;
+
+    // Skip entries already masked by condensed-milk — they're tiny
+    // placeholders (~15 tokens). Pruning/distilling them saves nothing
+    // and produces garbage distillations of placeholder text.
+    if (entry.maskedByCm) continue;
 
     // File-path protection: skip entries whose file paths match protected patterns
     if (protectedFilePatterns.length > 0) {
