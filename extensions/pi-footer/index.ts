@@ -49,6 +49,7 @@ const STATUS_ORDER: string[] = [
 ]
 const HIDDEN_STATUS_IDS = new Set<string>([
   // "executor",
+  "session-search",
 ])
 const HIDDEN_STATUS_TEXT_INCLUDES = [
   // "executor down",
