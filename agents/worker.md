@@ -91,7 +91,7 @@ Before marking done:
 
 ### 6. Commit
 
-Load the jujutsu OR git-commit (usually inside a worktree) skill and make a polished, descriptive commit.
+Load the vcs skill (usually inside a worktree) and make a polished, descriptive commit.
 
 ### 7. Close the Todo
 
