@@ -22,6 +22,7 @@
   "pi": {
     "extensions": [
       "./extensions/caveman/index.ts",
+      "./extensions/commit/index.ts",
       "./extensions/custom-provider-bedrock-inference-profiles/index.ts",
       "./extensions/fetch-url/index.ts",
       "./extensions/interactive-shell/index.ts",
