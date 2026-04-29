@@ -855,6 +855,12 @@ export default function (pi: ExtensionAPI) {
 
   const BAR_FILLED = "━"
   const BAR_EMPTY = "─"
+  const CTX_BAR_FILLED = "█"
+  const CTX_BAR_EMPTY = "⣿"
+  const CTX_BAR_LEFT = "["
+  const CTX_BAR_RIGHT = "]"
+  const CTX_YELLOW_FG = "\x1b[38;2;250;189;47m"
+  const CTX_RED_FG = "\x1b[38;2;234;105;98m"
 
   function formatTokenCount(tokens: number): string {
     if (tokens >= 1_000_000) {
@@ -877,15 +883,23 @@ export default function (pi: ExtensionAPI) {
     const filled = Math.round((clamped / 100) * CTX_GAUGE_WIDTH)
     const empty = CTX_GAUGE_WIDTH - filled
 
-    let color: string
-    if (clamped >= 90) color = "error"
-    else if (clamped >= 70) color = "warning"
-    else if (clamped >= 50) color = "accent"
-    else color = "success"
+    let filledBar: string
+    const filledText = CTX_BAR_FILLED.repeat(filled)
+    if (clamped > 75) {
+      filledBar = `${CTX_RED_FG}${filledText}\x1b[39m`
+    } else if (clamped > 60) {
+      filledBar = theme.fg("warning", filledText)
+    } else if (clamped > 40) {
+      filledBar = `${CTX_YELLOW_FG}${filledText}\x1b[39m`
+    } else {
+      filledBar = theme.fg("success", filledText)
+    }
 
     const bar =
-      theme.fg(color, BAR_FILLED.repeat(filled)) +
-      theme.fg("dim", BAR_EMPTY.repeat(empty))
+      theme.fg("dim", CTX_BAR_LEFT) +
+      filledBar +
+      theme.fg("dim", CTX_BAR_EMPTY.repeat(empty)) +
+      theme.fg("dim", CTX_BAR_RIGHT)
     const pct = `${Math.round(clamped)}%`
     const counts =
       used !== undefined && total
