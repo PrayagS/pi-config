@@ -2,14 +2,15 @@
 
 Pi tool extension that adds `questionnaire`.
 
-Use it when agent needs structured user input.
+Use it when agent needs structured user input with ask-style UX.
 
 ## Behavior
 
-- single question → simple option picker
-- multiple questions → tabbed flow with submit tab
-- optional `allowOther` freeform input per question
-- returns structured answers with selected value, label, and custom-input flag
+- single-select, multi-select, and preview-pane questions
+- single or multi-question flows use tabs plus a Review tab
+- every question includes inline `Type your own`
+- typed answers support pi-style `@` file references
+- returns normalized answers with values, labels, indices, and optional custom text
 
 ## Parameters
 
@@ -18,8 +19,13 @@ Each question supports:
 - `id`
 - `label?`
 - `prompt`
+- `type?`: `single` (default), `multi`, or `preview`
+- `required?`: metadata only; does not block submission
 - `options[]`
-- `allowOther?`
+  - `value`
+  - `label`
+  - `description?`
+  - `preview?` for preview-pane content
 
 ## Credits
 

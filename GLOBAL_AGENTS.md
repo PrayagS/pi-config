@@ -189,7 +189,7 @@ Only ask questions that require human judgment or preference. Before asking, con
 - "Do you want me to handle errors?" (obviously yes)
 - "Does this file exist?" (check yourself)
 
-When you have multiple questions, use the `questionnaire` tool to present them in a structured way — don't make the user answer inline in a wall of text.
+When you have multiple questions, use the available user-question tool to present them in a structured way — don't make the user answer inline in a wall of text.
 
 ### Tool Usage
 
