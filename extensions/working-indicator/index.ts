@@ -20,50 +20,26 @@ import type {
   ExtensionContext,
   WorkingIndicatorOptions,
 } from "@mariozechner/pi-coding-agent"
+import spinners, { type Spinner } from "unicode-animations"
 
 // ── Raw frame definitions (colored at runtime via theme) ────────
 
 interface IndicatorDef {
-  frames: string[]
+  frames: readonly string[]
   intervalMs: number
 }
 
-const VERT_FRAMES = [
-  "▁",
-  "▂",
-  "▃",
-  "▄",
-  "▅",
-  "▆",
-  "▇",
-  "█",
-  "▇",
-  "▆",
-  "▅",
-  "▄",
-  "▃",
-  "▂",
-]
-
-const THINKING_DEF: IndicatorDef = {
-  frames: ["▓", "▒", "░", "▒"],
-  intervalMs: 120,
+function fromSpinner(spinner: Spinner): IndicatorDef {
+  return {
+    frames: spinner.frames,
+    intervalMs: spinner.interval,
+  }
 }
 
-const TOOL_DEF: IndicatorDef = {
-  frames: VERT_FRAMES,
-  intervalMs: 40,
-}
-
-const STREAMING_DEF: IndicatorDef = {
-  frames: ["▓", "▒", "░", "▒"],
-  intervalMs: 120,
-}
-
-const WORKING_DEF: IndicatorDef = {
-  frames: VERT_FRAMES,
-  intervalMs: 40,
-}
+const THINKING_DEF = fromSpinner(spinners.waverows)
+const TOOL_DEF = fromSpinner(spinners.pulse)
+const STREAMING_DEF = fromSpinner(spinners.rain)
+const WORKING_DEF = fromSpinner(spinners.helix)
 
 // ── Phase state ─────────────────────────────────────────────────
 
