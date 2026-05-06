@@ -207,21 +207,19 @@ When you have multiple questions, use the available user-question tool to presen
 
 | Agent | Purpose | Model |
 |-------|---------|-------|
-| `spec` | Interactive spec agent — clarifies WHAT to build (intent, requirements, effort level, ISC). Produces a spec artifact. | Opus 4.6 (medium thinking) |
-| `planner` | Interactive planning agent — takes a spec and figures out HOW to build it. Explores approaches, validates design, writes plans, creates todos. | Opus 4.6 (medium thinking) |
-| `scout` | Fast codebase reconnaissance | Haiku (fast, cheap) |
-| `worker` | Implements tasks from todos, makes polished commits (always using the `commit` skill), and closes the todo. Reports back if a todo is missing examples/references. | Sonnet 4.6 |
-| `reviewer` | Reviews code for quality/security | Opus 4.6 (medium thinking) |
-| `researcher` | Deep research using Claude Code as a self-driving investigation agent (web search, cloning repos, downloading links, trying things out) | Opus 4.6 (medium thinking) |
+| `planner` | Interactive planning agent — clarifies WHAT to build and figures out HOW. Writes plans and task breakdowns. Can spawn scouts/researchers for facts. | Opus 4.6 (medium thinking) |
+| `researcher` | Deep research agent for autonomous investigation and evidence-backed synthesis. | Opus 4.6 (medium thinking) |
+| `scout` | Fast codebase reconnaissance — maps existing code, conventions, and patterns for a task. | Haiku 4.5 (minimal thinking) |
+| `worker` | Implements tasks — writes code, runs tests, commits with polished messages. Reports back if task lacks examples/references. | Sonnet 4.6 (minimal thinking) |
 
 #### Orchestration Mindset
 
 Subagents are **specialists in a system**. Each agent exists for a specific purpose — scouting, implementing, reviewing, researching, planning. When you spawn a subagent, it should:
 
 - **Focus on what's asked** — do the task, do it well, move on
-- **Not expand scope** — a spec agent doesn't plan architecture, a planner doesn't re-clarify requirements, a scout doesn't implement, a worker doesn't redesign, a reviewer doesn't rewrite
+- **Not expand scope** — a planner doesn't implement, a scout doesn't plan, a researcher doesn't decide architecture, a worker doesn't redesign
 - **Trust the system** — other agents handle what's outside your role
-- **Deliver and exit** — produce your artifact/commit/review, then terminate cleanly
+- **Deliver and exit** — produce your artifact, commit, or report, then terminate cleanly
 
 This isn't a rigid hierarchy — it's a team of specialists. Each agent leans hard into its strengths and trusts that the orchestrator (the main session or the user) will route the right work to the right agent.
 
@@ -229,40 +227,35 @@ This isn't a rigid hierarchy — it's a team of specialists. Each agent leans ha
 
 Subagents are **async** — the tool returns immediately and the agent can keep working. When a subagent finishes, its result is steered back to the main session as an interrupt. A live widget at the bottom of the screen shows all running subagents with elapsed time and progress.
 
-The `agent` parameter loads defaults from `~/.pi/agent/agents/<name>.md`. Model, tools, skills, thinking — all inherited. Explicit params override agent defaults.
+The `agent` parameter loads defaults from `~/.pi/agent/agents/<name>.md`. Model, runtime, tools, skills, and thinking come from frontmatter. For named agents, frontmatter is authoritative; call-time duplicates are ignored.
 
 ```typescript
 // Use existing agent definitions — full transparency
-subagent({ name: "Scout", agent: "scout", task: "Analyze the codebase..." })
-subagent({ name: "Worker", agent: "worker", task: "Implement TODO-xxxx..." })
-subagent({ name: "Reviewer", agent: "reviewer", task: "Review recent changes..." })
-subagent({ name: "Researcher", agent: "researcher", task: "Research [topic]..." })
+subagent({ name: "Scout", title: "Analyze codebase context", agent: "scout", task: "Analyze the codebase..." })
+subagent({ name: "Worker", title: "Implement scoped task", agent: "worker", task: "Implement task [id/summary]..." })
+subagent({ name: "Researcher", title: "Research decision inputs", agent: "researcher", task: "Research [topic]..." })
 
-// Spec — clarifies WHAT to build (interactive, user collaborates)
-subagent({ name: "📝 Spec", agent: "spec", interactive: true, task: "Define spec: [description]. Context: [relevant info]" })
-
-// Planner — figures out HOW to build it (interactive, receives spec as input)
-subagent({ name: "💬 Planner", agent: "planner", interactive: true, task: "Plan implementation for spec: [spec artifact path]. Context: [relevant info]" })
+// Planner — clarifies WHAT to build and figures out HOW
+subagent({ name: "💬 Planner", title: "Plan implementation approach", agent: "planner", task: "Plan implementation for [request]. Context: [relevant info]" })
 
 // Iterate — fork the session for focused work, full context preserved
 subagent({ name: "Iterate", fork: true, task: "Fix the bug where..." })
 
-// Override agent defaults when needed
-subagent({ name: "Worker", agent: "worker", model: "anthropic/claude-haiku-4-5", task: "Quick fix..." })
+// Named-agent frontmatter is authoritative. Do not try to override model/tools/runtime at call time.
 
-// Parallel execution — just call subagent multiple times, they all run concurrently
-subagent({ name: "Scout: Auth", agent: "scout", task: "Analyze auth module" })
-subagent({ name: "Scout: DB", agent: "scout", task: "Map database schema" })
+// Parallel execution — just call subagent multiple times in one tool-call batch
+subagent({ name: "Scout: Auth", title: "Analyze auth module", agent: "scout", task: "Analyze auth module" })
+subagent({ name: "Scout: DB", title: "Map database schema", agent: "scout", task: "Map database schema" })
 ```
 
-**Parallel execution:** Since subagents are async, just call `subagent` multiple times — they all run concurrently in their own cmux terminals. Results steer back independently as each finishes.
+**Parallel execution:** Since subagents are async, launch independent children in the same tool-call batch. Results steer back independently as each finishes.
 
-Subagents are full pi sessions — all extensions and skills auto-discover. A subagent can spawn another subagent (e.g., planner spawns a scout). Agent `.md` files in `~/.pi/agent/agents/` define model, tools, skills, thinking level.
+Subagents are full pi sessions. Agent `.md` files in `~/.pi/agent/agents/` define model, runtime, tools, skills, and thinking level. Current global agents use `session-mode: lineage-only`, so they start with isolated model context while still preserving parent-child lineage.
 
-**`auto-exit: true` frontmatter field** — Set in agent definition `.md` files to make the agent auto-shutdown when its turn ends, without needing to call `subagent_done`. Use for autonomous agents (scout, worker, reviewer). Don't use for interactive agents (spec, planner). Safety: if the user sends any input during the session, auto-exit is permanently disabled for that session.
+**`auto-exit: true` frontmatter field** — Set in agent definition `.md` files to make the agent auto-shutdown when its turn ends, without needing to call `subagent_done`. Currently `scout` and `worker` auto-exit. `planner` and `researcher` stay open for review/steering. Safety: if the user sends any input during the session, auto-exit is permanently disabled for that session.
 
 **Slash commands:**
-- `/plan <what to build>` — start the full planning workflow (assess → scout → spec → planner → execute → review)
+- `/plan <what to build>` — start the planning workflow (assess → scout if needed → planner → task breakdown → execute)
 - `/subagent <agent> <task>` — spawn a subagent by name (e.g., `/subagent scout analyze auth module`)
 - `/iterate [task]` — fork session for quick fixes
 
@@ -280,12 +273,11 @@ subagent({
 
 #### When to Delegate
 
-- **New feature or unclear requirements** → Start with `spec` to clarify WHAT, then `planner` for HOW
-- **Todos ready to execute** → Spawn `scout` then `worker` agents. **If the project defines a specialized agent** (e.g. `fullstack` for a web project), prefer it over generic `worker` — it has project-specific context, docs references, and often a stronger model.
-- **Worker reports missing context** → Provide the missing examples/references, update the todo, re-spawn the worker
-- **Code review needed** → Delegate to `reviewer`
-- **Need context first** → Start with `scout`
-- **Web research or external info needed** → Delegate to `researcher` (uses Claude Code as a self-driving investigation agent)
+- **New feature or unclear requirements** → Start with `planner` to clarify WHAT and HOW, write plan, then create task breakdown.
+- **Tasks ready to execute** → Spawn `scout` for context if needed, then `worker` with a self-contained task. **If the project defines a specialized agent** (e.g. `fullstack` for a web project), prefer it over generic `worker`.
+- **Worker reports missing context** → Provide examples/references, update the `pi-tasks` task if one exists, re-spawn the worker.
+- **Need codebase context first** → Start with `scout`.
+- **Web research or external info needed** → Delegate to `researcher`.
 
 #### When NOT to Delegate
 
