@@ -1,13 +1,12 @@
 ---
 name: worker
 description: Implements tasks - writes code, runs tests, commits with polished messages
-deny-tools: claude
 model: bedrock-inference-profiles/anthropic.claude-sonnet-4-6
 thinking: minimal
-async: true
-session-mode: lineage-only
 spawning: false
+async: true
 auto-exit: true
+session-mode: lineage-only
 system-prompt: append
 ---
 

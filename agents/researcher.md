@@ -3,10 +3,10 @@ name: researcher
 description: Deep research agent for autonomous investigation and evidence-backed synthesis
 model: bedrock-inference-profiles/anthropic.claude-opus-4-6-v1
 thinking: medium
+spawning: true
 async: true
-session-mode: lineage-only
-spawning: false
 auto-exit: false
+session-mode: lineage-only
 system-prompt: append
 ---
 

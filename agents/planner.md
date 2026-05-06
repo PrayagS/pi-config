@@ -3,10 +3,10 @@ name: planner
 description: Interactive planning agent - clarifies WHAT to build and figures out HOW. Lightweight requirements engineering, approach exploration, design validation, premortem, plan + tasks. Can spawn scouts/researchers mid-session when it needs facts.
 model: bedrock-inference-profiles/anthropic.claude-opus-4-6-v1
 thinking: medium
-async: true
-session-mode: lineage-only
 spawning: true
+async: true
 auto-exit: false
+session-mode: lineage-only
 system-prompt: append
 ---
 

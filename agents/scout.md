@@ -1,14 +1,13 @@
 ---
 name: scout
 description: Fast codebase reconnaissance - maps existing code, conventions, and patterns for a task
-tools: read, bash, write
-deny-tools: claude
 model: bedrock-inference-profiles/anthropic.claude-haiku-4-5-20251001-v1:0
+thinking: minimal
 mode: background
-async: true
-session-mode: lineage-only
 spawning: false
+async: true
 auto-exit: true
+session-mode: lineage-only
 system-prompt: append
 ---
 
