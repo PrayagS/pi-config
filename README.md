@@ -30,7 +30,7 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/pi-co-authored-by/` — append AI trailers to git/jj commits
 - `extensions/pi-dcp/` — dynamic context pruning (automatic rules + LLM tools)
 - `extensions/pi-footer/` — footer/status UI tweaks
-- `extensions/prompt-history/` — recall prompts from all saved sessions with Ctrl+K/Ctrl+J
+- `extensions/prompt-history/` — recall prompts from all saved sessions with Ctrl+K/Ctrl+J and fuzzy-search them with Ctrl+R
 - `extensions/questionnaire/` — structured question UI tool
 - `extensions/sandbox/` — command sandboxing
 - `extensions/supacode/` — Supacode busy state + completion notification hooks
