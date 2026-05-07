@@ -15,8 +15,9 @@ import { dirname, join, resolve } from "node:path"
 import type {
   AgentToolResult,
   ExtensionAPI,
+  ExtensionContext,
 } from "@mariozechner/pi-coding-agent"
-import { Text } from "@mariozechner/pi-tui"
+import { Text, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui"
 import { Type } from "@sinclair/typebox"
 
 interface ClaudeConfig {
@@ -49,8 +50,28 @@ interface RunResult {
   transcriptPath?: string
 }
 
+interface RunningClaude {
+  runId: string
+  prompt: string
+  mode: "background" | "interactive"
+  startTime: number
+}
+
+interface ClaudeResultMessageDetails extends RunDetails {
+  prompt: string
+}
+
+interface ThemeLike {
+  fg(name: string, text: string): string
+  bg(name: string, text: string): string
+  bold(text: string): string
+}
+
 const DEFAULT_BLOCK_TIMEOUT_MS = 600_000
 const PLUGIN_DIR = join(dirname(fileURLToPath(import.meta.url)), "plugin")
+const runningClaude = new Map<string, RunningClaude>()
+let latestCtx: ExtensionContext | null = null
+let widgetInterval: ReturnType<typeof setInterval> | null = null
 
 function loadClaudeConfig(): ClaudeConfig {
   const configPath = join(homedir(), ".pi", "agent", "pi-spawn-claude-code.json")
@@ -65,7 +86,8 @@ function loadClaudeConfig(): ClaudeConfig {
 function buildClaudeArgs(
   prompt: string,
   mode: "background" | "interactive",
-  config: ClaudeConfig
+  config: ClaudeConfig,
+  resumeSessionId?: string
 ): string[] {
   const args: string[] = []
   if (mode === "background") args.push("-p")
@@ -77,6 +99,7 @@ function buildClaudeArgs(
     args.push("--allowed-tools", config.allowedTools.join(","))
   if (mode === "interactive" && existsSync(PLUGIN_DIR))
     args.push("--plugin-dir", PLUGIN_DIR)
+  if (resumeSessionId) args.push("--resume", resumeSessionId)
   if (config.additionalArgs?.length) args.push(...config.additionalArgs)
   args.push(prompt)
 
@@ -109,6 +132,47 @@ function formatResult(result: RunResult): string {
   return lines.join("\n")
 }
 
+function padVisible(text: string, width: number): string {
+  return text + " ".repeat(Math.max(0, width - visibleWidth(text)))
+}
+
+function renderPanel(
+  title: string,
+  subtitle: string,
+  body: string[],
+  width: number,
+  theme: ThemeLike,
+  tone: "running" | "success" | "error" = "running"
+): string[] {
+  const panelWidth = Math.max(44, Math.min(width, 110))
+  const innerWidth = panelWidth - 4
+  const borderColor = tone === "error" ? "error" : tone === "success" ? "success" : "accent"
+  const bgColor = tone === "error" ? "toolErrorBg" : "toolSuccessBg"
+  const paint = (line: string) => theme.bg(bgColor, line)
+  const border = (text: string) => theme.fg(borderColor, text)
+  const topLabel = ` ${title} `
+  const topFill = Math.max(0, panelWidth - visibleWidth(topLabel) - 2)
+  const top = paint(`${border("╭")}${border(topLabel)}${border("─".repeat(topFill))}${border("╮")}`)
+  const lines = [top]
+  if (subtitle) lines.push(boxedLine(theme.fg("muted", subtitle), innerWidth, paint, border))
+  if (body.length > 0) lines.push(boxedLine("", innerWidth, paint, border))
+  for (const line of body) {
+    lines.push(boxedLine(line, innerWidth, paint, border))
+  }
+  lines.push(paint(`${border("╰")}${border("─".repeat(panelWidth - 2))}${border("╯")}`))
+  return lines
+}
+
+function boxedLine(
+  text: string,
+  innerWidth: number,
+  paint: (line: string) => string,
+  border: (line: string) => string
+): string {
+  const clipped = truncateToWidth(text, innerWidth)
+  return paint(`${border("│")} ${padVisible(clipped, innerWidth)} ${border("│")}`)
+}
+
 function toolResult(result: RunResult): AgentToolResult<RunDetails> {
   return {
     content: [{ type: "text", text: result.report }],
@@ -130,17 +194,82 @@ function startedResult(runId: string, mode: "background" | "interactive"): Agent
   }
 }
 
+function updateWidget(): void {
+  if (runningClaude.size === 0) {
+    latestCtx?.ui.setWidget("pi-spawn-claude-code", undefined)
+    if (widgetInterval) {
+      clearInterval(widgetInterval)
+      widgetInterval = null
+    }
+    return
+  }
+
+  if (!latestCtx?.hasUI) return
+
+  latestCtx.ui.setWidget(
+    "pi-spawn-claude-code",
+    (_tui, theme) => ({
+      invalidate() {},
+      render(width: number) {
+        const body: string[] = []
+        for (const running of runningClaude.values()) {
+          const elapsed = formatDuration(Date.now() - running.startTime)
+          const firstLine =
+            running.prompt.split("\n").find((line) => line.trim()) ?? running.prompt
+          const preview =
+            firstLine.length > 90 ? `${firstLine.slice(0, 90)}…` : firstLine
+          body.push(
+            `${theme.fg("accent", "●")} ${theme.fg("toolTitle", running.mode)} ${theme.fg("muted", running.runId)} ${theme.fg("success", elapsed)}`
+          )
+          body.push(`  ${theme.fg("toolOutput", preview)}`)
+        }
+        return renderPanel(
+          "Claude Code",
+          `${runningClaude.size} running`,
+          body,
+          width,
+          theme,
+          "running"
+        )
+      },
+    }),
+    { placement: "aboveEditor" }
+  )
+}
+
+function trackAsyncRun(runId: string, prompt: string, mode: "background" | "interactive"): void {
+  runningClaude.set(runId, { runId, prompt, mode, startTime: Date.now() })
+  updateWidget()
+  if (!widgetInterval) widgetInterval = setInterval(updateWidget, 1000)
+}
+
+function finishAsyncRun(runId: string): void {
+  runningClaude.delete(runId)
+  updateWidget()
+}
+
 function sendAsyncReport(
   pi: ExtensionAPI,
-  ctx: { isIdle(): boolean },
+  prompt: string,
   result: RunResult
 ): void {
-  const report = formatResult(result)
-  if (ctx.isIdle()) {
-    pi.sendUserMessage(report)
-  } else {
-    pi.sendUserMessage(report, { deliverAs: "steer" })
-  }
+  pi.sendMessage<ClaudeResultMessageDetails>(
+    {
+      customType: "pi_spawn_claude_code_result",
+      content: formatResult(result),
+      display: true,
+      details: {
+        runId: result.runId,
+        prompt,
+        mode: result.mode,
+        async: result.async,
+        exitCode: result.exitCode,
+        elapsedMs: result.elapsedMs,
+        transcriptPath: result.transcriptPath,
+      },
+    },
+    { triggerTurn: true, deliverAs: "steer" }
+  )
 }
 
 function runBackground(
@@ -150,9 +279,10 @@ function runBackground(
   config: ClaudeConfig,
   signal: AbortSignal | undefined,
   asyncMode: boolean,
+  resumeSessionId?: string,
 ): Promise<RunResult> {
   const start = Date.now()
-  const child = spawn("claude", buildClaudeArgs(prompt, "background", config), {
+  const child = spawn("claude", buildClaudeArgs(prompt, "background", config, resumeSessionId), {
     cwd,
     env: process.env,
     signal,
@@ -313,6 +443,7 @@ async function runInteractive(
   config: ClaudeConfig,
   signal: AbortSignal | undefined,
   asyncMode: boolean,
+  resumeSessionId?: string,
 ): Promise<RunResult> {
   const pane = await spawnTmux(
     ["split-window", "-d", "-h", "-P", "-F", "#{pane_id}"],
@@ -335,7 +466,7 @@ async function runInteractive(
   const scriptPath = join(tempDir, "run.sh")
   const command = commandFromArgs(
     "claude",
-    buildClaudeArgs(prompt, "interactive", config)
+    buildClaudeArgs(prompt, "interactive", config, resumeSessionId)
   )
   writeFileSync(
     scriptPath,
@@ -387,14 +518,66 @@ function withTimeout<T>(
 }
 
 export default function piSpawnClaudeCodeExtension(pi: ExtensionAPI) {
+  pi.on("session_start", (_event, ctx) => {
+    latestCtx = ctx
+  })
+
+  pi.on("session_shutdown", () => {
+    if (widgetInterval) clearInterval(widgetInterval)
+    widgetInterval = null
+    runningClaude.clear()
+    latestCtx?.ui.setWidget("pi-spawn-claude-code", undefined)
+    latestCtx = null
+  })
+
+  pi.registerMessageRenderer<ClaudeResultMessageDetails>(
+    "pi_spawn_claude_code_result",
+    (message, options, theme) => {
+      const details = message.details
+      const content = typeof message.content === "string" ? message.content : ""
+      const isError = details?.exitCode != null && details.exitCode !== 0
+      const contentLines = content.split("\n")
+      const body = options.expanded ? contentLines : contentLines.slice(0, 8)
+      const remaining = contentLines.length - body.length
+      const renderedBody = body.map((line, index) =>
+        index === 0 ? theme.fg("toolOutput", line) : theme.fg("dim", line)
+      )
+      if (remaining > 0)
+        renderedBody.push(theme.fg("muted", `… ${remaining} more lines`))
+      if (details?.transcriptPath)
+        renderedBody.push(
+          theme.fg("muted", `Transcript: ${details.transcriptPath}`)
+        )
+
+      return {
+        invalidate() {},
+        render(width: number) {
+          return renderPanel(
+            isError ? "Claude Code failed" : "Claude Code complete",
+            `${details?.mode ?? "unknown"}, ${formatDuration(details?.elapsedMs ?? 0)}`,
+            renderedBody,
+            width,
+            theme,
+            isError ? "error" : "success"
+          )
+        },
+      }
+    }
+  )
+
   pi.registerTool({
     name: "claude",
     label: "Pi Spawn Claude Code",
-    description: "Run Claude Code CLI in background or interactive tmux mode and collect its final report.",
-    promptSnippet: "Run Claude Code CLI with a prompt in background or interactive tmux mode",
+    description:
+      "Run Claude Code CLI in background or interactive tmux mode and collect its final report. Use for hands-on coding investigation, experiments, debugging, and direct Claude Code delegation; async runs return immediately and deliver results later via steer.",
+    promptSnippet:
+      "Run Claude Code CLI with a prompt in background or interactive tmux mode. Use for hands-on code investigation, experiments, debugging, and direct Claude Code delegation. Async runs return immediately; wait for the steered result before using findings.",
     promptGuidelines: [
-      "Use claude when the user asks to run Claude Code CLI directly.",
-      "For async claude runs, wait for the steered completion report instead of assuming the result.",
+      "Use claude when the user explicitly asks to run Claude Code CLI or when a task benefits from a separate hands-on Claude Code session with terminal and filesystem access.",
+      "Good uses: exploring repo internals, debugging complex issues, trying libraries, running experiments, prototyping approaches, building or testing projects, and resuming prior Claude Code sessions.",
+      "Do not use claude for simple file reads, small obvious edits, quick commands you can run yourself, web research, URL fetching, or documentation lookup.",
+      "For async claude runs, wait for the steered completion report before summarizing findings or taking dependent action. Do not fabricate or assume results.",
+      "Use resumeSessionId when continuing a prior Claude Code session; still include the follow-up instruction in prompt.",
     ],
     parameters: Type.Object({
       prompt: Type.String({ description: "Prompt to pass to Claude Code CLI" }),
@@ -402,6 +585,12 @@ export default function piSpawnClaudeCodeExtension(pi: ExtensionAPI) {
         description: "Run with claude -p in background, or in an interactive tmux pane",
       }),
       async: Type.Boolean({ description: "Return immediately and steer completion later when true" }),
+      resumeSessionId: Type.Optional(
+        Type.String({
+          description:
+            "Resume a previous Claude Code session ID and send prompt as the follow-up instruction",
+        })
+      ),
     }),
     renderCall(args, theme, context) {
       const text =
@@ -426,7 +615,8 @@ export default function piSpawnClaudeCodeExtension(pi: ExtensionAPI) {
               ctx.cwd,
               config,
               runSignal,
-              params.async
+              params.async,
+              params.resumeSessionId
             )
           : runInteractive(
               runId,
@@ -434,21 +624,28 @@ export default function piSpawnClaudeCodeExtension(pi: ExtensionAPI) {
               ctx.cwd,
               config,
               runSignal,
-              params.async
+              params.async,
+              params.resumeSessionId
             )
 
       if (params.async) {
+        trackAsyncRun(runId, params.prompt, params.mode)
         run.then(
-          (result) => sendAsyncReport(pi, ctx, result),
-          (error) =>
-            sendAsyncReport(pi, ctx, {
+          (result) => {
+            finishAsyncRun(runId)
+            sendAsyncReport(pi, params.prompt, result)
+          },
+          (error) => {
+            finishAsyncRun(runId)
+            sendAsyncReport(pi, params.prompt, {
               runId,
               mode: params.mode,
               async: true,
               report: error instanceof Error ? error.message : String(error),
               exitCode: null,
               elapsedMs: 0,
-            }),
+            })
+          },
         )
         return startedResult(runId, params.mode)
       }
