@@ -33,7 +33,6 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/prompt-history/` — recall prompts from all saved sessions with Ctrl+K/Ctrl+J and fuzzy-search them with Ctrl+R
 - `extensions/questionnaire/` — structured question UI tool
 - `extensions/sandbox/` — command sandboxing
-- `extensions/supacode/` — Supacode busy state + completion notification hooks
 - `extensions/tools/` — tooling controls
 - `extensions/web-search/` — web search tool
 - `extensions/working-indicator/` — phase-aware working spinner (thinking/tool/streaming/working)

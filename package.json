@@ -33,7 +33,6 @@
       "./extensions/pi-footer/index.ts",
       "./extensions/questionnaire/index.ts",
       "./extensions/sandbox/index.ts",
-      "./extensions/supacode/index.ts",
       "./extensions/tools/index.ts",
       "./extensions/web-search/index.ts",
       "./extensions/working-indicator/index.ts",
