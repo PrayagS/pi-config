@@ -41,8 +41,7 @@
       "./extensions/zzz-system-prompt-filter/index.ts"
     ],
     "skills": [
-      "./skills",
-      "./extensions/caveman/caveman-compress"
+      "./skills"
     ],
     "themes": []
   },

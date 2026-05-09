@@ -45,7 +45,6 @@ pi -e git:github.com/PrayagS/pi-config
 - `skills/vcs/` — unified git/jj version-control workflow with shared commit-message guidance
 - `skills/skill-creator/` — scaffold Pi skills
 - `skills/yaml-reader/` — query and validate YAML with `yq`
-- `extensions/caveman/caveman-compress/` — compress memory files into caveman format
 
 ## AGENTS.md
 

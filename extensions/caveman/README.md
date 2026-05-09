@@ -29,7 +29,6 @@ Default mode resolution:
 ## Related
 
 - system prompt source: `caveman-system-prompt.md`
-- bundled skill: `caveman-compress/`
 - sync script: `sync-skill.sh`
 
 ## Credits

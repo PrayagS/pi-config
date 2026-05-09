@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sync-skill.sh — fetch upstream caveman files, rewrite bundled base skill, and sync bundled compress skill + scripts.
+# sync-skill.sh — fetch upstream caveman files and rewrite bundled base skill.
 
 set -euo pipefail
 
@@ -74,16 +74,8 @@ for line in lines:
 Path(sys.argv[2]).write_text("\n".join(out) + "\n")
 PY
 
-mkdir -p "$REPO_ROOT/caveman-compress"
-fetch_raw "caveman-compress/SKILL.md" "$REPO_ROOT/caveman-compress/SKILL.md"
-fetch_dir "caveman-compress/scripts" "$REPO_ROOT/caveman-compress/scripts"
-
 UPSTREAM_BASE_SHA="$(curl -fsSL "https://api.github.com/repos/$UPSTREAM_REPO/commits?path=caveman/SKILL.md&per_page=1" |
-	grep -o '"sha": "[^"]*"' | head -1 | cut -d'"' -f4)"
-UPSTREAM_COMPRESS_SHA="$(curl -fsSL "https://api.github.com/repos/$UPSTREAM_REPO/commits?path=caveman-compress/SKILL.md&per_page=1" |
 	grep -o '"sha": "[^"]*"' | head -1 | cut -d'"' -f4)"
 
 echo "Synced $REPO_ROOT/caveman-system-prompt.md"
 echo "Base skill SHA: $UPSTREAM_BASE_SHA"
-echo "Synced $REPO_ROOT/caveman-compress/SKILL.md"
-echo "Compress skill SHA: $UPSTREAM_COMPRESS_SHA"
