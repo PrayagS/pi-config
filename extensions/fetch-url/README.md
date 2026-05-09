@@ -6,6 +6,7 @@ Pi tool extension that adds `fetch_url`.
 
 ## Features
 
+- **Domain handlers** — GitHub, Hacker News, and Reddit get specialized extraction (structured APIs or CLI instructions) instead of generic HTML scraping
 - `selector` to narrow extraction to one part of page
 - `includeLinks` to preserve hyperlinks
 - `rawHtml` to bypass Readability when extraction fails

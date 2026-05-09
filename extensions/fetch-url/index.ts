@@ -5,9 +5,10 @@
  * readable Markdown content.
  *
  * Extraction priority:
- *   1. Markdown via content negotiation (if server supports it)
- *   2. Readability + Turndown (default for HTML)
- *   3. Raw HTML tag-stripping + Turndown (via `rawHtml: true` fallback)
+ *   1. Domain-specific handlers (GitHub, HN, Reddit)
+ *   2. Markdown via content negotiation (if server supports it)
+ *   3. Readability + Turndown (default for HTML)
+ *   4. Raw HTML tag-stripping + Turndown (via `rawHtml: true` fallback)
  *
  * Supports:
  *   - CSS selector narrowing
@@ -29,6 +30,7 @@ import {
 } from "@mariozechner/pi-coding-agent"
 import { Text } from "@mariozechner/pi-tui"
 import { Type } from "@sinclair/typebox"
+import { domainHandlers } from "./domain-handlers"
 
 // ─── Core fetch + extract ──────────────────────────────────────────
 
@@ -231,7 +233,54 @@ export default function fetchUrlExtension(pi: ExtensionAPI) {
       ),
     }),
 
-    async execute(_toolCallId, params, _signal) {
+    async execute(_toolCallId, params, signal) {
+      // ── Step 1: Try domain-specific handlers ────────────────
+      for (const handler of domainHandlers) {
+        const domainOutput = await handler(params.url, signal)
+        if (domainOutput !== null) {
+          // Domain handler matched — use its output directly
+          const truncation = truncateHead(domainOutput, {
+            maxLines: DEFAULT_MAX_LINES,
+            maxBytes: DEFAULT_MAX_BYTES,
+          })
+
+          let output = truncation.content
+
+          if (truncation.truncated) {
+            const tempDir = await mkdtemp(join(tmpdir(), "pi-fetch-url-"))
+            const tempFile = join(tempDir, "output.md")
+            await withFileMutationQueue(tempFile, async () => {
+              await writeFile(tempFile, domainOutput, "utf8")
+            })
+
+            output += `\n\n[Truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines`
+            output += ` (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}).`
+            output += ` Full output saved to: ${tempFile}]`
+
+            return {
+              content: [{ type: "text" as const, text: output }],
+              details: {
+                url: params.url,
+                truncated: true,
+                totalLines: truncation.totalLines,
+                fullOutputPath: tempFile,
+                method: "domain-handler",
+              },
+            }
+          }
+
+          return {
+            content: [{ type: "text" as const, text: output }],
+            details: {
+              url: params.url,
+              totalLines: truncation.totalLines,
+              method: "domain-handler",
+            },
+          }
+        }
+      }
+
+      // ── Step 2: Normal fetch pipeline ───────────────────────
       try {
         const result = await fetchAndExtract(params.url, {
           selector: params.selector,
@@ -319,7 +368,11 @@ export default function fetchUrlExtension(pi: ExtensionAPI) {
       }
       let text = theme.fg("success", "✓ ")
       if (details?.title) text += theme.fg("toolTitle", details.title) + " "
-      text += theme.fg("muted", `(${details?.totalLines ?? "?"} lines`)
+      if (details?.method === "domain-handler") {
+        text += theme.fg("muted", "(domain handler")
+      } else {
+        text += theme.fg("muted", `(${details?.totalLines ?? "?"} lines`)
+      }
       if (details?.truncated) text += theme.fg("warning", ", truncated")
       if (details?.selector)
         text += theme.fg("muted", `, selector: ${details.selector}`)

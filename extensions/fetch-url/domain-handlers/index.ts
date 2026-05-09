@@ -1,0 +1,22 @@
+export { handleGitHub } from "./github"
+export { handleHackerNews } from "./hackernews"
+export { handleReddit } from "./reddit"
+export type { DomainHandler } from "./types"
+
+import type { DomainHandler } from "./types"
+import { handleGitHub } from "./github"
+import { handleHackerNews } from "./hackernews"
+import { handleReddit } from "./reddit"
+
+/**
+ * Ordered list of domain handlers.
+ *
+ * The fetch tool runs these before the normal HTML pipeline.
+ * First handler to return non-null wins.
+ * Order matters — put most specific URL patterns first.
+ */
+export const domainHandlers: DomainHandler[] = [
+  handleGitHub,
+  handleHackerNews,
+  handleReddit,
+]
