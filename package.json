@@ -57,10 +57,8 @@
     "format": "biome format --write ."
   },
   "dependencies": {
-    "@mozilla/readability": "^0.5.0",
+    "defuddle": "^0.18.1",
     "jsdom": "^26.0.0",
-    "turndown": "^7.2.0",
-    "turndown-plugin-gfm": "^1.0.2",
     "unicode-animations": "^1.0.3"
   }
 }
