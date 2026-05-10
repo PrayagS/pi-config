@@ -7,8 +7,9 @@
  * Extraction priority:
  *   1. Domain-specific handlers (GitHub, HN, Reddit)
  *   2. Markdown via content negotiation (if server supports it)
- *   3. Readability + Turndown (default for HTML)
- *   4. Raw HTML tag-stripping + Turndown (via `rawHtml: true` fallback)
+ *   3. markdown.new proxy (URL → Markdown service)
+ *   4. Readability + Turndown (default for HTML)
+ *   5. Raw HTML tag-stripping + Turndown (via `rawHtml: true` fallback)
  *
  * Supports:
  *   - CSS selector narrowing
@@ -97,6 +98,26 @@ async function fetchAndExtract(
       length: raw.length,
       url,
     }
+  }
+
+  // Step 2: Try markdown.new proxy (URL → Markdown service)
+  try {
+    const mdResponse = await fetch(`https://markdown.new/${url}`)
+    if (mdResponse.ok) {
+      const mdText = await mdResponse.text()
+      if (mdText.trim()) {
+        const titleMatch = mdText.match(/^#\s+(.+)$/m)
+        return {
+          title: titleMatch?.[1] || url,
+          content: mdText,
+          byline: "",
+          length: mdText.length,
+          url,
+        }
+      }
+    }
+  } catch {
+    // Fall through to Readability path
   }
 
   // HTML path
