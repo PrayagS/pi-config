@@ -9,13 +9,9 @@
  *   2. Markdown via content negotiation (if server supports it)
  *   3. markdown.new proxy (URL → Markdown service)
  *   4. Readability + Turndown (default for HTML)
- *   5. Raw HTML tag-stripping + Turndown (via `rawHtml: true` fallback)
  *
  * Supports:
- *   - CSS selector narrowing
  *   - Truncation with temp file for large pages (agent uses `read` to page)
- *   - Optional link preservation (stripped by default to save tokens)
- *   - Optional Readability bypass for pages where it fails
  */
 
 import { mkdtemp, writeFile } from "node:fs/promises"
@@ -35,12 +31,6 @@ import { domainHandlers } from "./domain-handlers"
 
 // ─── Core fetch + extract ──────────────────────────────────────────
 
-interface FetchOpts {
-  selector?: string
-  includeLinks?: boolean
-  rawHtml?: boolean
-}
-
 interface FetchResult {
   title: string
   content: string
@@ -49,10 +39,7 @@ interface FetchResult {
   url: string
 }
 
-async function fetchAndExtract(
-  url: string,
-  opts: FetchOpts
-): Promise<FetchResult> {
+async function fetchAndExtract(url: string): Promise<FetchResult> {
   const { Readability } = await import("@mozilla/readability")
   const { JSDOM } = await import("jsdom")
   const TurndownService = (await import("turndown")).default
@@ -124,46 +111,17 @@ async function fetchAndExtract(
   const html = await response.text()
   const dom = new JSDOM(html, { url })
 
-  if (opts.selector) {
-    const selected = dom.window.document.querySelector(opts.selector)
-    if (selected) {
-      dom.window.document.body.innerHTML = selected.outerHTML
-    }
+  // Readability extraction
+  const article = new Readability(dom.window.document).parse()
+  if (!article?.content) {
+    throw new Error(
+      "Readability could not extract content from this page."
+    )
   }
-
-  let articleHtml: string
-  let title: string
-  let byline = ""
-  let originalLength = 0
-
-  if (opts.rawHtml) {
-    // Fallback: strip non-content tags, convert body directly
-    const doc = dom.window.document
-    for (const tag of [
-      "script",
-      "style",
-      "nav",
-      "footer",
-      "header",
-      "noscript",
-    ]) {
-      doc.querySelectorAll(tag).forEach((el: any) => el.remove())
-    }
-    articleHtml = doc.body?.innerHTML || ""
-    title = doc.title || ""
-  } else {
-    // Primary: Readability extraction
-    const article = new Readability(dom.window.document).parse()
-    if (!article?.content) {
-      throw new Error(
-        "Readability could not extract content from this page. Retry with rawHtml: true to skip Readability."
-      )
-    }
-    articleHtml = article.content
-    title = article.title || ""
-    byline = article.byline || ""
-    originalLength = article.length || 0
-  }
+  const articleHtml = article.content
+  const title = article.title || ""
+  const byline = article.byline || ""
+  const originalLength = article.length || 0
 
   if (!articleHtml.trim()) {
     throw new Error("Could not extract content from this page")
@@ -186,13 +144,10 @@ async function fetchAndExtract(
   td.use(gfm)
 
   td.addRule("removeImages", { filter: "img", replacement: () => "" })
-
-  if (!opts.includeLinks) {
-    td.addRule("stripLinks", {
-      filter: "a",
-      replacement: (_content: string, node: any) => node.textContent || "",
-    })
-  }
+  td.addRule("stripLinks", {
+    filter: "a",
+    replacement: (_content: string, node: any) => node.textContent || "",
+  })
 
   const markdown = td
     .turndown(articleHtml)
@@ -227,31 +182,10 @@ export default function fetchUrlExtension(pi: ExtensionAPI) {
     description: [
       "Fetch a URL and return clean, readable content as Markdown.",
       "Prefers markdown via content negotiation; falls back to Readability + Turndown for HTML.",
-      "Use `selector` to extract a specific section (CSS selector).",
       `Output is truncated to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)}. If truncated, full output is saved to a temp file — use the read tool to page through it.`,
-      "Set `includeLinks: true` to preserve hyperlinks (stripped by default to save tokens).",
-      "Set `rawHtml: true` to skip Readability and convert raw HTML (useful when Readability fails or returns bad output).",
     ].join(" "),
     parameters: Type.Object({
       url: Type.String({ description: "URL to fetch" }),
-      selector: Type.Optional(
-        Type.String({
-          description:
-            "CSS selector to narrow extraction (e.g. 'main', '.docs-content', '#api-reference')",
-        })
-      ),
-      includeLinks: Type.Optional(
-        Type.Boolean({
-          description:
-            "Keep hyperlinks in output. Default: false (saves tokens)",
-        })
-      ),
-      rawHtml: Type.Optional(
-        Type.Boolean({
-          description:
-            "Skip Readability, strip tags and convert raw HTML. Use when Readability output looks wrong.",
-        })
-      ),
     }),
 
     async execute(_toolCallId, params, signal) {
@@ -303,11 +237,7 @@ export default function fetchUrlExtension(pi: ExtensionAPI) {
 
       // ── Step 2: Normal fetch pipeline ───────────────────────
       try {
-        const result = await fetchAndExtract(params.url, {
-          selector: params.selector,
-          includeLinks: params.includeLinks,
-          rawHtml: params.rawHtml,
-        })
+        const result = await fetchAndExtract(params.url)
         const header = [
           result.title && `# ${result.title}`,
           result.byline && `*${result.byline}*`,
@@ -344,8 +274,6 @@ export default function fetchUrlExtension(pi: ExtensionAPI) {
               truncated: true,
               totalLines: truncation.totalLines,
               fullOutputPath: tempFile,
-              selector: params.selector,
-              rawHtml: params.rawHtml,
             },
           }
         }
@@ -356,8 +284,6 @@ export default function fetchUrlExtension(pi: ExtensionAPI) {
             url: result.url,
             title: result.title,
             totalLines: truncation.totalLines,
-            selector: params.selector,
-            rawHtml: params.rawHtml,
           },
         }
       } catch (err: any) {
@@ -377,8 +303,6 @@ export default function fetchUrlExtension(pi: ExtensionAPI) {
     renderCall(args, theme) {
       let text = theme.fg("toolTitle", theme.bold("fetch_url "))
       text += theme.fg("accent", args.url || "...")
-      if (args.selector) text += theme.fg("muted", ` → ${args.selector}`)
-      if (args.rawHtml) text += theme.fg("muted", ` [raw]`)
       return new Text(text, 0, 0)
     },
 
@@ -395,9 +319,6 @@ export default function fetchUrlExtension(pi: ExtensionAPI) {
         text += theme.fg("muted", `(${details?.totalLines ?? "?"} lines`)
       }
       if (details?.truncated) text += theme.fg("warning", ", truncated")
-      if (details?.selector)
-        text += theme.fg("muted", `, selector: ${details.selector}`)
-      if (details?.rawHtml) text += theme.fg("muted", `, raw`)
       text += theme.fg("muted", ")")
       if (details?.fullOutputPath) {
         text +=
