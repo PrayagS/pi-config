@@ -7,8 +7,9 @@
  * Extraction priority:
  *   1. Domain-specific handlers (GitHub, HN, Reddit)
  *   2. Markdown via content negotiation (if server supports it)
- *   3. markdown.new proxy (URL → Markdown service)
- *   4. Defuddle (default for HTML)
+ *   3. Jina AI Reader API (URL → Markdown, requires PI_WEB_FETCH_JINA_API_KEY)
+ *   4. markdown.new proxy (URL → Markdown service)
+ *   5. Defuddle (default for HTML)
  *
  * Supports:
  *   - Truncation with temp file for large pages (agent uses `read` to page)

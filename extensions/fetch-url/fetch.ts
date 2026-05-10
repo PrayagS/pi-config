@@ -1,6 +1,6 @@
 
 
-export type ExtractionStage = "content-negotiation" | "markdown-new" | "defuddle"
+export type ExtractionStage = "content-negotiation" | "jina-ai" | "markdown-new" | "defuddle"
 
 export interface FetchResult {
   title: string
@@ -21,6 +21,34 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 30_000): Pr
     return await fetch(url, { ...init, signal: controller.signal })
   } finally {
     clearTimeout(t)
+  }
+}
+
+/** Try Jina AI Reader API. */
+async function tryJinaReader(url: string): Promise<string | null> {
+  const apiKey = process.env.PI_WEB_FETCH_JINA_API_KEY
+  if (!apiKey) return null
+
+  try {
+    const res = await fetchWithTimeout(
+      "https://r.jina.ai/",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ url }),
+      },
+      15_000,
+    )
+    if (!res.ok) return null
+    const json = await res.json()
+    const content = json?.data?.content
+    return typeof content === "string" ? content.trim() || null : null
+  } catch {
+    return null
   }
 }
 
@@ -82,7 +110,20 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
     }
   }
 
-  // 2. Try markdown.new proxy
+  // 2. Try Jina AI Reader API
+  const jina = await tryJinaReader(url)
+  if (jina) {
+    return {
+      title: extractTitle(jina, url),
+      content: jina,
+      byline: "",
+      length: jina.length,
+      url,
+      stage: "jina-ai",
+    }
+  }
+
+  // 3. Try markdown.new proxy
   const mdNew = await tryMarkdownNew(url)
   if (mdNew) {
     return {
@@ -95,7 +136,7 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
     }
   }
 
-  // 3. HTML → Defuddle
+  // 4. HTML → Defuddle
   const [{ Defuddle }, { JSDOM }] = await Promise.all([
     import("defuddle/node"),
     import("jsdom"),
