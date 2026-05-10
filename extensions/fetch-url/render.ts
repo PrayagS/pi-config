@@ -12,9 +12,9 @@ export function renderResult(result: any, { expanded }: { expanded: boolean }, t
 
   let text = theme.fg("success", "✓ ")
   if (d?.title) text += theme.fg("toolTitle", d.title) + " "
-  text += theme.fg("muted", d?.method === "domain-handler" ? "(domain handler" : `(${d?.totalLines ?? "?"} lines`)
+  text += theme.fg("muted", d?.method === "domain-handler" ? "(domain handler" : `(${d?.stage ?? "?"}`)
   if (d?.truncated) text += theme.fg("warning", ", truncated")
-  text += theme.fg("muted", ")")
+  text += theme.fg("muted", `, ${d?.totalLines ?? "?"} lines)`)
 
   if (d?.fullOutputPath) {
     text += "\n" + theme.fg("muted", `Full output: ${d.fullOutputPath}`)

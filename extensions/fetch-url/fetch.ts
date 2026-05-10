@@ -1,11 +1,14 @@
 
 
+export type ExtractionStage = "content-negotiation" | "markdown-new" | "defuddle"
+
 export interface FetchResult {
   title: string
   content: string
   byline: string
   length: number
   url: string
+  stage: ExtractionStage
 }
 
 const UA =
@@ -75,6 +78,7 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
       byline: "",
       length: raw.length,
       url,
+      stage: "content-negotiation",
     }
   }
 
@@ -87,6 +91,7 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
       byline: "",
       length: mdNew.length,
       url,
+      stage: "markdown-new",
     }
   }
 
@@ -109,5 +114,6 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
     byline: result.author || "",
     length: result.wordCount || markdown.length,
     url,
+    stage: "defuddle",
   }
 }

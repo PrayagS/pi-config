@@ -64,6 +64,7 @@ export default function fetchUrlExtension(pi: ExtensionAPI) {
 
         const { text, details } = await truncateToTemp(fullText, result.url, {
           title: result.title,
+          stage: result.stage,
         })
 
         return {
