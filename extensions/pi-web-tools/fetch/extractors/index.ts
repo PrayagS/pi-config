@@ -21,8 +21,8 @@ export const apiExtractors: Extractor[] = [
   jina,
   firecrawl,
   parallel,
-  tavily,
   exa,
+  tavily,
   you,
   markdownNew,
 ]

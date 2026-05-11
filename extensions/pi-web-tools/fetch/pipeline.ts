@@ -82,28 +82,22 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
     }
   }
 
-  // Normal pipeline: direct fetch → extractors → defuddle
-  const res = await fetchWithTimeout(url, {
+  // Stage 1: Content negotiation — try direct markdown fetch
+  const cnRes = await fetchWithTimeout(url, {
     headers: {
       "User-Agent": UA,
-      Accept:
-        "text/markdown, text/html;q=0.9, application/xhtml+xml;q=0.9, application/xml;q=0.8, */*;q=0.1",
+      Accept: "text/markdown",
       "Accept-Language": "en-US,en;q=0.9",
     },
     redirect: "follow",
   })
 
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-
-  const contentType = res.headers.get("content-type") || ""
-
-  // Content negotiation — server returned markdown directly
   if (
-    contentType.includes("markdown") ||
-    (!contentType.includes("html") && !contentType.includes("xml"))
+    cnRes.ok &&
+    (cnRes.headers.get("content-type") || "").includes("markdown")
   ) {
-    const raw = await res.text()
-    return buildResult(url, { markdown: raw }, "content-negotiation")
+    const raw = await cnRes.text()
+    if (raw.trim()) return buildResult(url, { markdown: raw }, "content-negotiation")
   }
 
   // Try API extractors in priority order
@@ -113,6 +107,17 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
   }
 
   // Fallback: Defuddle HTML extraction
+  const res = await fetchWithTimeout(url, {
+    headers: {
+      "User-Agent": UA,
+      Accept: "text/html, application/xhtml+xml;q=0.9, application/xml;q=0.8, */*;q=0.1",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+    redirect: "follow",
+  })
+
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+
   const [{ Defuddle }, { JSDOM }] = await Promise.all([
     import("defuddle/node"),
     import("jsdom"),

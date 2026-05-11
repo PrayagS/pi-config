@@ -21,6 +21,10 @@ export const tavily: Extractor = {
       )
       if (!res.ok) return null
       const json = await res.json()
+
+      // Treat non-empty failed_results as failure
+      if (json?.failed_results != null) return null
+
       const content = json?.results?.[0]?.raw_content
       if (typeof content !== "string") return null
       return { markdown: content.trim() }

@@ -21,6 +21,16 @@ export const exa: Extractor = {
       )
       if (!res.ok) return null
       const json = await res.json()
+
+      // Treat any non-success status as failure
+      const statuses = json?.statuses
+      if (Array.isArray(statuses)) {
+        const ourStatus = statuses.find(
+          (s: any) => s?.id === url || s?.id === decodeURIComponent(url)
+        )
+        if (!ourStatus || ourStatus.status !== "success") return null
+      }
+
       const result = json?.results?.[0]
       const text = result?.text
       if (typeof text !== "string") return null
