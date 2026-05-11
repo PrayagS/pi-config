@@ -24,7 +24,7 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/caveman/` — response-style control with `/caveman`
 - `extensions/commit/` — `/commit` command that prefetches VCS context and asks the agent to commit
 - `extensions/custom-provider-bedrock-inference-profiles/` — Bedrock inference profile support
-- `extensions/fetch-url/` — fetch URL content as clean Markdown
+- `extensions/web-fetch/` — fetch URL content as clean Markdown
 - `extensions/interactive-shell/` — interactive shell integration
 - `extensions/notify/` — notifications
 - `extensions/pi-co-authored-by/` — append AI trailers to git/jj commits

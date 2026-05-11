@@ -3,7 +3,7 @@
 export type ExtractionStage = "content-negotiation" | "jina-ai" | "firecrawl" | "parallel" | "tavily" | "exa" | "you" | "markdown-new" | "defuddle"
 
 function shouldRunStage(stage: ExtractionStage): boolean {
-  const envStage = process.env.PI_FETCH_URL_STAGE
+  const envStage = process.env.PI_WEB_FETCH_STAGE
   return !envStage || envStage === stage
 }
 
@@ -238,7 +238,7 @@ function cleanMarkdown(md: string): string {
 }
 
 export async function fetchAndExtract(url: string): Promise<FetchResult> {
-  const envStage = process.env.PI_FETCH_URL_STAGE
+  const envStage = process.env.PI_WEB_FETCH_STAGE
 
   // When a specific stage is requested, skip direct fetch and run only that stage
   if (envStage) {

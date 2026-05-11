@@ -31,7 +31,7 @@ export async function truncateToTemp(
     }
   }
 
-  const tempDir = await mkdtemp(join(tmpdir(), "pi-fetch-url-"))
+  const tempDir = await mkdtemp(join(tmpdir(), "pi-web-fetch-"))
   const tempFile = join(tempDir, "output.md")
   await withFileMutationQueue(tempFile, async () => {
     await writeFile(tempFile, fullText, "utf8")

@@ -1,7 +1,7 @@
 /**
- * Fetch URL Extension
+ * Web Fetch Extension
  *
- * Provides a `fetch_url` tool that fetches a URL and returns clean,
+ * Provides a `web_fetch` tool that fetches a URL and returns clean,
  * readable Markdown content.
  *
  * Extraction priority:
@@ -34,8 +34,8 @@ import { renderCall, renderResult } from "./render"
 
 export default function fetchUrlExtension(pi: ExtensionAPI) {
   pi.registerTool({
-    name: "fetch_url",
-    label: "Fetch URL",
+    name: "web_fetch",
+    label: "Web Fetch",
     description: [
       "Fetch a URL and return clean, readable content as Markdown.",
       "Prefers markdown via content negotiation; falls back to Defuddle for HTML.",

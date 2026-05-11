@@ -1,8 +1,8 @@
-# fetch-url
+# web-fetch
 
-Pi tool extension that adds `fetch_url`.
+Pi tool extension that adds `web_fetch`.
 
-`fetch_url` fetches a page and returns clean Markdown. It prefers markdown responses when available, otherwise extracts readable HTML content with Defuddle.
+`web_fetch` fetches a page and returns clean Markdown. It prefers markdown responses when available, otherwise extracts readable HTML content with Defuddle.
 
 ## Features
 

@@ -1,5 +1,5 @@
 /**
- * Smoke test for fetch-url domain handlers.
+ * Smoke test for web-fetch domain handlers.
  *
  * Run: bun test-handlers.ts
  */

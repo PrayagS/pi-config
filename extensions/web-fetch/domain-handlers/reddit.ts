@@ -32,7 +32,7 @@ async function fetchJson(url: string, signal?: AbortSignal): Promise<any> {
 
     const res = await fetch(url, {
       signal: effectiveSignal,
-      headers: { "User-Agent": "pi-fetch-url/1.0" },
+      headers: { "User-Agent": "pi-web-fetch/1.0" },
     })
     if (!res.ok) return null
     return await res.json()

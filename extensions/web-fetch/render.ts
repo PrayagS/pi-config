@@ -1,7 +1,7 @@
 import { Text } from "@mariozechner/pi-tui"
 
 export function renderCall(args: any, theme: any): typeof Text.prototype {
-  let text = theme.fg("toolTitle", theme.bold("fetch_url "))
+  let text = theme.fg("toolTitle", theme.bold("web_fetch "))
   text += theme.fg("accent", args.url || "...")
   return new Text(text, 0, 0)
 }
