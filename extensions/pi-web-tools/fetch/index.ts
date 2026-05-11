@@ -40,8 +40,8 @@ export const webFetchTool = {
     try {
       const rawHtml = params.rawHtml === true
       const result = rawHtml
-        ? await fetchRawHtml(params.url)
-        : await fetchAndExtract(params.url)
+        ? await fetchRawHtml(params.url, signal)
+        : await fetchAndExtract(params.url, signal)
 
       let fullText: string
       if (rawHtml) {

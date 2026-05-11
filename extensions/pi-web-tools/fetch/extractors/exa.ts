@@ -3,7 +3,7 @@ import type { Extractor } from "./types"
 
 export const exa: Extractor = {
   name: "exa",
-  async extract(url) {
+  async extract(url, signal) {
     const apiKey = process.env.PI_WEB_FETCH_EXA_API_KEY
     if (!apiKey) return null
     try {
@@ -16,8 +16,8 @@ export const exa: Extractor = {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ ids: [url], text: { verbosity: "full" } }),
-        },
-        30_000
+          signal,
+        }
       )
       if (!res.ok) return null
       const json = await res.json()

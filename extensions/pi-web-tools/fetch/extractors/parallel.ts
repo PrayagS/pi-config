@@ -5,7 +5,7 @@ let sessionId: string | undefined
 
 export const parallel: Extractor = {
   name: "parallel",
-  async extract(url) {
+  async extract(url, signal) {
     const apiKey = process.env.PI_WEB_FETCH_PARALLEL_API_KEY
     if (!apiKey) return null
     try {
@@ -24,8 +24,8 @@ export const parallel: Extractor = {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(body),
-        },
-        30_000
+          signal,
+        }
       )
       if (!res.ok) return null
       const json = await res.json()

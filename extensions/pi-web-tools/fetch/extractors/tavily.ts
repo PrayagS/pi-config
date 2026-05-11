@@ -3,7 +3,7 @@ import type { Extractor } from "./types"
 
 export const tavily: Extractor = {
   name: "tavily",
-  async extract(url) {
+  async extract(url, signal) {
     const apiKey = process.env.PI_WEB_FETCH_TAVILY_API_KEY
     if (!apiKey) return null
     try {
@@ -16,8 +16,8 @@ export const tavily: Extractor = {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ urls: [url], extract_depth: "advanced" }),
-        },
-        30_000
+          signal,
+        }
       )
       if (!res.ok) return null
       const json = await res.json()

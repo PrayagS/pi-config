@@ -1,21 +1,14 @@
-export type { Extractor, ExtractResult } from "./types"
-
-export { jina } from "./jina"
-export { firecrawl } from "./firecrawl"
-export { parallel } from "./parallel"
-export { tavily } from "./tavily"
-export { exa } from "./exa"
-export { you } from "./you"
-export { markdownNew } from "./markdown-new"
-
-import { jina } from "./jina"
+import type { Extractor } from "./types"
+import { exa } from "./exa"
 import { firecrawl } from "./firecrawl"
+import { jina } from "./jina"
+import { markdownNew } from "./markdown-new"
 import { parallel } from "./parallel"
 import { tavily } from "./tavily"
-import { exa } from "./exa"
 import { you } from "./you"
-import { markdownNew } from "./markdown-new"
-import type { Extractor } from "./types"
+
+export type { Extractor, ExtractResult } from "./types"
+export { exa, firecrawl, jina, markdownNew, parallel, tavily, you }
 
 export const apiExtractors: Extractor[] = [
   jina,

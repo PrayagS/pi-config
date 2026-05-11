@@ -3,7 +3,7 @@ import type { Extractor } from "./types"
 
 export const you: Extractor = {
   name: "you",
-  async extract(url, _signal, options) {
+  async extract(url, signal, options) {
     const apiKey = process.env.PI_WEB_FETCH_YOU_API_KEY
     if (!apiKey) return null
     try {
@@ -21,8 +21,8 @@ export const you: Extractor = {
             formats,
             crawl_timeout: 10,
           }),
-        },
-        30_000
+          signal,
+        }
       )
       if (!res.ok) return null
       const json = await res.json()

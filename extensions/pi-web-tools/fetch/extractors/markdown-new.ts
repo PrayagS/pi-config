@@ -3,12 +3,11 @@ import type { Extractor } from "./types"
 
 export const markdownNew: Extractor = {
   name: "markdown-new",
-  async extract(url) {
+  async extract(url, signal) {
     try {
       const res = await fetchWithTimeout(
         `https://markdown.new/${url}`,
-        {},
-        15_000
+        { signal, timeout: 15_000 }
       )
       if (!res.ok) return null
       const text = await res.text()

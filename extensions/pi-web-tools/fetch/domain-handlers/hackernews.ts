@@ -1,7 +1,7 @@
+import { fetchJson } from "../extractors/http"
 import type { DomainHandler } from "./types"
 
 const API_BASE = "https://hacker-news.firebaseio.com/v0"
-const TIMEOUT_MS = 15_000
 
 interface HNItem {
   id: number
@@ -18,33 +18,14 @@ interface HNItem {
   descendants?: number
 }
 
-async function fetchJson<T>(
-  url: string,
-  signal?: AbortSignal
-): Promise<T | null> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
-
-  try {
-    const effectiveSignal = signal
-      ? AbortSignal.any([signal, controller.signal])
-      : controller.signal
-
-    const res = await fetch(url, { signal: effectiveSignal })
-    if (!res.ok) return null
-    return (await res.json()) as T
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
-
 async function fetchItem(
   id: number,
   signal?: AbortSignal
 ): Promise<HNItem | null> {
-  return fetchJson<HNItem>(`${API_BASE}/item/${id}.json`, signal)
+  return fetchJson<HNItem>(`${API_BASE}/item/${id}.json`, {
+    signal,
+    timeout: 15_000,
+  })
 }
 
 async function fetchItems(
@@ -201,22 +182,28 @@ export const handleHackerNews: DomainHandler = async (
 
   // Front pages
   if (parsed.pathname === "/" || parsed.pathname === "/news") {
-    const ids = await fetchJson<number[]>(`${API_BASE}/topstories.json`, signal)
+    const ids = await fetchJson<number[]>(`${API_BASE}/topstories.json`, {
+      signal,
+      timeout: 15_000,
+    })
     if (!ids) return null
     return await renderListing(ids, "Hacker News — Top Stories", signal)
   }
 
   if (parsed.pathname === "/newest") {
-    const ids = await fetchJson<number[]>(`${API_BASE}/newstories.json`, signal)
+    const ids = await fetchJson<number[]>(`${API_BASE}/newstories.json`, {
+      signal,
+      timeout: 15_000,
+    })
     if (!ids) return null
     return await renderListing(ids, "Hacker News — New", signal)
   }
 
   if (parsed.pathname === "/best") {
-    const ids = await fetchJson<number[]>(
-      `${API_BASE}/beststories.json`,
-      signal
-    )
+    const ids = await fetchJson<number[]>(`${API_BASE}/beststories.json`, {
+      signal,
+      timeout: 15_000,
+    })
     if (!ids) return null
     return await renderListing(ids, "Hacker News — Best", signal)
   }

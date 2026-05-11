@@ -3,7 +3,7 @@ import type { Extractor } from "./types"
 
 export const jina: Extractor = {
   name: "jina-ai",
-  async extract(url, _signal, options) {
+  async extract(url, signal, options) {
     const apiKey = process.env.PI_WEB_FETCH_JINA_API_KEY
     if (!apiKey) return null
     try {
@@ -20,8 +20,9 @@ export const jina: Extractor = {
           method: "POST",
           headers,
           body: JSON.stringify({ url }),
-        },
-        15_000
+          signal,
+          timeout: 15_000,
+        }
       )
       if (!res.ok) return null
       const json = await res.json()

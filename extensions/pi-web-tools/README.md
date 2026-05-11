@@ -7,17 +7,23 @@ Pi extension providing `web_search` and `web_fetch` tools.
 ```
 ├── index.ts                  # extension entry — registers both tools
 ├── search/                   # web_search tool
-│   └── index.ts              #   createWebSearchTool factory (+ types, execute, render)
+│   ├── index.ts              #   createWebSearchTool factory + execute
+│   ├── kagi.ts               #   Kagi CLI args + result formatting
+│   ├── render.ts             #   render functions
+│   └── types.ts              #   Kagi response/tool detail types
 ├── fetch/                    # web_fetch tool
 │   ├── index.ts              #   webFetchTool config (domain dispatch → pipeline → truncate)
-│   ├── pipeline.ts           #   fetchAndExtract orchestrator + FetchResult types
+│   ├── pipeline.ts           #   fetchAndExtract/fetchRawHtml orchestration
+│   ├── content-negotiation.ts #   direct markdown fetch stage
+│   ├── defuddle.ts           #   Defuddle fallback extraction
+│   ├── result.ts             #   FetchResult types + result builder
 │   ├── render.ts             #   render functions
 │   ├── truncate.ts           #   truncation helper
 │   ├── extractors/           #   API content extractors — self-contained modules
 │   │   ├── index.ts          #     barrel + apiExtractors registry
 │   │   ├── types.ts          #     Extractor interface
-│   │   ├── http.ts           #     shared fetchWithTimeout
-│   │   ├── jina.ts → firecrawl.ts → parallel.ts → tavily.ts → exa.ts → you.ts
+│   │   ├── http.ts           #     shared fetchWithTimeout + fetchJson
+│   │   ├── jina.ts → firecrawl.ts → parallel.ts → exa.ts → tavily.ts → you.ts
 │   │   └── markdown-new.ts
 │   ├── domain-handlers/      #   specialized handlers for GitHub, HN, Reddit
 │   └── test-handlers.ts      #   domain handler smoke tests
@@ -30,7 +36,7 @@ Pi extension providing `web_search` and `web_fetch` tools.
 1. Create `fetch/extractors/<name>.ts` implementing `Extractor`
 2. Export named const with `name` + `extract(url)` method
 3. Register in `fetch/extractors/index.ts` barrel + `apiExtractors` array
-4. Add stage name to `ExtractionStage` union in `fetch/pipeline.ts`
+4. Add stage name to `ExtractionStage` union in `fetch/result.ts`
 
 ## `web_search`
 
@@ -60,8 +66,8 @@ Fetch a URL and return clean, readable Markdown content.
    - Jina AI Reader (`PI_WEB_FETCH_JINA_API_KEY`)
    - Firecrawl (`PI_WEB_FETCH_FIRECRAWL_API_KEY`)
    - Parallel (`PI_WEB_FETCH_PARALLEL_API_KEY`)
-   - Tavily (`PI_WEB_FETCH_TAVILY_API_KEY`)
    - Exa.ai (`PI_WEB_FETCH_EXA_API_KEY`)
+   - Tavily (`PI_WEB_FETCH_TAVILY_API_KEY`)
    - You.com (`PI_WEB_FETCH_YOU_API_KEY`)
    - markdown.new proxy
 4. **Defuddle** — default HTML extraction

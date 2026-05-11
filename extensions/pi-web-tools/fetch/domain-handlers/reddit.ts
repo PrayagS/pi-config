@@ -1,6 +1,5 @@
+import { fetchJson } from "../extractors/http"
 import type { DomainHandler } from "./types"
-
-const TIMEOUT_MS = 15_000
 
 interface RedditPost {
   title: string
@@ -19,28 +18,6 @@ interface RedditComment {
   author: string
   score: number
   created_utc: number
-}
-
-async function fetchJson(url: string, signal?: AbortSignal): Promise<any> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
-
-  try {
-    const effectiveSignal = signal
-      ? AbortSignal.any([signal, controller.signal])
-      : controller.signal
-
-    const res = await fetch(url, {
-      signal: effectiveSignal,
-      headers: { "User-Agent": "pi-web-tools/1.0" },
-    })
-    if (!res.ok) return null
-    return await res.json()
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timeoutId)
-  }
 }
 
 function formatDate(utc: number): string {
@@ -84,7 +61,11 @@ export const handleReddit: DomainHandler = async (
     jsonUrl = `${url.replace(/\/$/, "").replace(parsed.search, "")}.json${parsed.search}`
   }
 
-  const data = await fetchJson(jsonUrl, signal)
+  const data = await fetchJson(jsonUrl, {
+    signal,
+    timeout: 15_000,
+    headers: { "User-Agent": "pi-web-tools/1.0" },
+  })
   if (!data) return null
 
   const lines: string[] = []

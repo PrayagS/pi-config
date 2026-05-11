@@ -6,7 +6,6 @@ import {
   DEFAULT_MAX_LINES,
   formatSize,
   truncateHead,
-  withFileMutationQueue,
 } from "@mariozechner/pi-coding-agent"
 
 export interface TruncationResult {
@@ -34,9 +33,7 @@ export async function truncateToTemp(
 
   const tempDir = await mkdtemp(join(tmpdir(), "pi-web-tools-"))
   const tempFile = join(tempDir, `output.${ext}`)
-  await withFileMutationQueue(tempFile, async () => {
-    await writeFile(tempFile, fullText, "utf8")
-  })
+  await writeFile(tempFile, fullText, "utf8")
 
   let output = t.content
   output += `\n\n[Truncated: showing ${t.outputLines} of ${t.totalLines} lines`
