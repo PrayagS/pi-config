@@ -2,6 +2,11 @@
 
 export type ExtractionStage = "content-negotiation" | "jina-ai" | "firecrawl" | "markdown-new" | "defuddle"
 
+function shouldRunStage(stage: ExtractionStage): boolean {
+  const envStage = process.env.PI_FETCH_URL_STAGE
+  return !envStage || envStage === stage
+}
+
 export interface FetchResult {
   title: string
   content: string
@@ -66,7 +71,7 @@ async function tryFirecrawl(url: string): Promise<string | null> {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, formats: ["markdown"], onlyCleanContent: true }),
+        body: JSON.stringify({ url, formats: ["markdown"] }),
       },
       30_000,
     )
@@ -125,7 +130,7 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
   const contentType = res.headers.get("content-type") || ""
 
   // 1. Server returned markdown directly
-  if (contentType.includes("markdown") || (!contentType.includes("html") && !contentType.includes("xml"))) {
+  if (shouldRunStage("content-negotiation") && (contentType.includes("markdown") || (!contentType.includes("html") && !contentType.includes("xml")))) {
     const raw = await res.text()
     return {
       title: extractTitle(raw, url),
@@ -138,63 +143,73 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
   }
 
   // 2. Try Jina AI Reader API
-  const jina = await tryJinaReader(url)
-  if (jina) {
-    return {
-      title: extractTitle(jina, url),
-      content: jina,
-      byline: "",
-      length: jina.length,
-      url,
-      stage: "jina-ai",
+  if (shouldRunStage("jina-ai")) {
+    const jina = await tryJinaReader(url)
+    if (jina) {
+      return {
+        title: extractTitle(jina, url),
+        content: jina,
+        byline: "",
+        length: jina.length,
+        url,
+        stage: "jina-ai",
+      }
     }
   }
 
   // 3. Try Firecrawl
-  const firecrawl = await tryFirecrawl(url)
-  if (firecrawl) {
-    return {
-      title: extractTitle(firecrawl, url),
-      content: firecrawl,
-      byline: "",
-      length: firecrawl.length,
-      url,
-      stage: "firecrawl",
+  if (shouldRunStage("firecrawl")) {
+    const firecrawl = await tryFirecrawl(url)
+    if (firecrawl) {
+      return {
+        title: extractTitle(firecrawl, url),
+        content: firecrawl,
+        byline: "",
+        length: firecrawl.length,
+        url,
+        stage: "firecrawl",
+      }
     }
   }
 
   // 4. Try markdown.new proxy
-  const mdNew = await tryMarkdownNew(url)
-  if (mdNew) {
-    return {
-      title: extractTitle(mdNew, url),
-      content: mdNew,
-      byline: "",
-      length: mdNew.length,
-      url,
-      stage: "markdown-new",
+  if (shouldRunStage("markdown-new")) {
+    const mdNew = await tryMarkdownNew(url)
+    if (mdNew) {
+      return {
+        title: extractTitle(mdNew, url),
+        content: mdNew,
+        byline: "",
+        length: mdNew.length,
+        url,
+        stage: "markdown-new",
+      }
     }
   }
 
   // 5. HTML → Defuddle
-  const [{ Defuddle }, { JSDOM }] = await Promise.all([
-    import("defuddle/node"),
-    import("jsdom"),
-  ])
-  const html = await res.text()
-  const dom = new JSDOM(html, { url })
-  const result = await Defuddle(dom.window.document, url, { markdown: true, removeImages: true })
+  if (shouldRunStage("defuddle")) {
+    const [{ Defuddle }, { JSDOM }] = await Promise.all([
+      import("defuddle/node"),
+      import("jsdom"),
+    ])
+    const html = await res.text()
+    const dom = new JSDOM(html, { url })
+    const result = await Defuddle(dom.window.document, url, { markdown: true, removeImages: true })
 
-  if (!result.content?.trim()) throw new Error("Could not extract content from this page")
+    if (!result.content?.trim()) throw new Error("Could not extract content from this page")
 
-  const markdown = cleanMarkdown(result.content)
+    const markdown = cleanMarkdown(result.content)
 
-  return {
-    title: result.title || "",
-    content: markdown,
-    byline: result.author || "",
-    length: result.wordCount || markdown.length,
-    url,
-    stage: "defuddle",
+    return {
+      title: result.title || "",
+      content: markdown,
+      byline: result.author || "",
+      length: result.wordCount || markdown.length,
+      url,
+      stage: "defuddle",
+    }
   }
+
+  throw new Error(`Stage "${process.env.PI_FETCH_URL_STAGE}" did not produce content for ${url}`)
 }
