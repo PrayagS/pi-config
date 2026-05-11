@@ -9,8 +9,12 @@
  *   2. Markdown via content negotiation (if server supports it)
  *   3. Jina AI Reader API (URL → Markdown, requires PI_WEB_FETCH_JINA_API_KEY)
  *   4. Firecrawl scrape API (URL → Markdown, requires PI_WEB_FETCH_FIRECRAWL_API_KEY)
- *   5. markdown.new proxy (URL → Markdown service)
- *   6. Defuddle (default for HTML)
+ *   5. Parallel Extract API (URL → Markdown, requires PI_WEB_FETCH_PARALLEL_API_KEY)
+ *   6. Tavily extract API (URL → Markdown, requires PI_WEB_FETCH_TAVILY_API_KEY)
+ *   7. Exa.ai contents API (URL → Markdown, requires PI_WEB_FETCH_EXA_API_KEY)
+ *   8. You.com Contents API (URL → Markdown, requires PI_WEB_FETCH_YOU_API_KEY)
+ *   9. markdown.new proxy (URL → Markdown service)
+ *  10. Defuddle (default for HTML)
  *
  * Supports:
  *   - Truncation with temp file for large pages (agent uses `read` to page)
