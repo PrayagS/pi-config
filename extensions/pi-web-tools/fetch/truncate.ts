@@ -17,7 +17,8 @@ export interface TruncationResult {
 export async function truncateToTemp(
   fullText: string,
   url: string,
-  extraDetails: Record<string, any> = {}
+  extraDetails: Record<string, any> = {},
+  ext = "md"
 ): Promise<TruncationResult> {
   const t = truncateHead(fullText, {
     maxLines: DEFAULT_MAX_LINES,
@@ -32,7 +33,7 @@ export async function truncateToTemp(
   }
 
   const tempDir = await mkdtemp(join(tmpdir(), "pi-web-tools-"))
-  const tempFile = join(tempDir, "output.md")
+  const tempFile = join(tempDir, `output.${ext}`)
   await withFileMutationQueue(tempFile, async () => {
     await writeFile(tempFile, fullText, "utf8")
   })

@@ -3,10 +3,11 @@ import type { Extractor } from "./types"
 
 export const you: Extractor = {
   name: "you",
-  async extract(url) {
+  async extract(url, _signal, options) {
     const apiKey = process.env.PI_WEB_FETCH_YOU_API_KEY
     if (!apiKey) return null
     try {
+      const formats = options?.rawHtml ? ["html"] : ["markdown"]
       const res = await fetchWithTimeout(
         "https://ydc-index.io/v1/contents",
         {
@@ -17,7 +18,7 @@ export const you: Extractor = {
           },
           body: JSON.stringify({
             urls: [url],
-            formats: ["markdown"],
+            formats,
             crawl_timeout: 10,
           }),
         },
@@ -26,6 +27,13 @@ export const you: Extractor = {
       if (!res.ok) return null
       const json = await res.json()
       const item = Array.isArray(json) ? json[0] : null
+
+      if (options?.rawHtml) {
+        const html = item?.html
+        if (typeof html !== "string") return null
+        return { markdown: "", html: html.trim(), title: item?.title }
+      }
+
       const markdown = item?.markdown
       if (typeof markdown !== "string") return null
       return { markdown: markdown.trim(), title: item?.title }

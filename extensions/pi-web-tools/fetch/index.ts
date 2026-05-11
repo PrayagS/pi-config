@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox"
 import { domainHandlers } from "./domain-handlers"
-import { fetchAndExtract } from "./pipeline"
+import { fetchAndExtract, fetchRawHtml } from "./pipeline"
 import { renderCall, renderResult } from "./render"
 import { truncateToTemp } from "./truncate"
 
@@ -11,6 +11,13 @@ export const webFetchTool = {
     "Fetch a URL and return clean, readable content as Markdown. Prefers markdown via content negotiation; falls back to Defuddle for HTML. Output is truncated to agent limits. If truncated, full output is saved to a temp file — use the read tool to page through it.",
   parameters: Type.Object({
     url: Type.String({ description: "URL to fetch" }),
+    rawHtml: Type.Optional(
+      Type.Boolean({
+        default: false,
+        description:
+          "Return raw HTML instead of Markdown. Uses jina → firecrawl (rawHtml) → you (html) → Defuddle (HTML). Default: false.",
+      })
+    ),
   }),
 
   async execute(_toolCallId: string, params: any, signal?: AbortSignal) {
@@ -30,20 +37,34 @@ export const webFetchTool = {
 
     // Normal fetch pipeline
     try {
-      const result = await fetchAndExtract(params.url)
-      const header = [
-        result.title && `# ${result.title}`,
-        result.byline && `*${result.byline}*`,
-        `Source: ${result.url}`,
-      ]
-        .filter(Boolean)
-        .join("\n")
-      const fullText = `${header}\n\n---\n\n${result.content}`
+      const rawHtml = params.rawHtml === true
+      const result = rawHtml
+        ? await fetchRawHtml(params.url)
+        : await fetchAndExtract(params.url)
 
-      const { text, details } = await truncateToTemp(fullText, result.url, {
-        title: result.title,
-        stage: result.stage,
-      })
+      let fullText: string
+      if (rawHtml) {
+        fullText = result.content
+      } else {
+        const header = [
+          result.title && `# ${result.title}`,
+          result.byline && `*${result.byline}*`,
+          `Source: ${result.url}`,
+        ]
+          .filter(Boolean)
+          .join("\n")
+        fullText = `${header}\n\n---\n\n${result.content}`
+      }
+
+      const { text, details } = await truncateToTemp(
+        fullText,
+        result.url,
+        {
+          title: result.title,
+          stage: result.stage,
+        },
+        rawHtml ? "html" : "md"
+      )
 
       return {
         content: [

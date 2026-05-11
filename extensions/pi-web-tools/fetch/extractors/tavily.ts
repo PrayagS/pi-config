@@ -23,7 +23,8 @@ export const tavily: Extractor = {
       const json = await res.json()
 
       // Treat non-empty failed_results as failure
-      if (json?.failed_results != null) return null
+      const failed = json?.failed_results
+      if (Array.isArray(failed) && failed.length > 0) return null
 
       const content = json?.results?.[0]?.raw_content
       if (typeof content !== "string") return null
