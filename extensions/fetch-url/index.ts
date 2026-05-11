@@ -50,7 +50,7 @@ export default function fetchUrlExtension(pi: ExtensionAPI) {
             method: "domain-handler",
           })
           return {
-            content: [{ type: "text" as const, text }],
+            content: [{ type: "text" as const, text, source: "domain-handler" }],
             details,
           }
         }
@@ -70,12 +70,12 @@ export default function fetchUrlExtension(pi: ExtensionAPI) {
         })
 
         return {
-          content: [{ type: "text" as const, text }],
+          content: [{ type: "text" as const, text, source: result.stage, metadata: result.metadata }],
           details,
         }
       } catch (err: any) {
         return {
-          content: [{ type: "text" as const, text: `Failed to fetch ${params.url}: ${err.message}` }],
+          content: [{ type: "text" as const, text: `Failed to fetch ${params.url}: ${err.message}`, source: "error" }],
           details: { url: params.url, error: err.message },
           isError: true,
         }

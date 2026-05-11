@@ -14,6 +14,7 @@ export interface FetchResult {
   length: number
   url: string
   stage: ExtractionStage
+  metadata?: Record<string, unknown>
 }
 
 const UA =
@@ -58,7 +59,7 @@ async function tryJinaReader(url: string): Promise<string | null> {
 }
 
 /** Try Firecrawl scrape API. */
-async function tryFirecrawl(url: string): Promise<string | null> {
+async function tryFirecrawl(url: string): Promise<{ markdown: string; metadata: Record<string, unknown> } | null> {
   const apiKey = process.env.PI_WEB_FETCH_FIRECRAWL_API_KEY
   if (!apiKey) return null
 
@@ -77,8 +78,15 @@ async function tryFirecrawl(url: string): Promise<string | null> {
     )
     if (!res.ok) return null
     const json = await res.json()
-    const content = json?.data?.markdown
-    return typeof content === "string" ? content.trim() || null : null
+    const data = json?.data
+    const content = data?.markdown
+    if (typeof content !== "string") return null
+    const meta = data?.metadata
+    const metadata: Record<string, unknown> = {}
+    if (meta?.title) metadata.title = meta.title
+    if (meta?.cacheState) metadata.cacheState = meta.cacheState
+    if (meta?.cachedAt) metadata.cachedAt = meta.cachedAt
+    return { markdown: content.trim() || "", metadata }
   } catch {
     return null
   }
@@ -162,12 +170,13 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
     const firecrawl = await tryFirecrawl(url)
     if (firecrawl) {
       return {
-        title: extractTitle(firecrawl, url),
-        content: firecrawl,
+        title: extractTitle(firecrawl.markdown, url),
+        content: firecrawl.markdown,
         byline: "",
-        length: firecrawl.length,
+        length: firecrawl.markdown.length,
         url,
         stage: "firecrawl",
+        metadata: firecrawl.metadata,
       }
     }
   }
