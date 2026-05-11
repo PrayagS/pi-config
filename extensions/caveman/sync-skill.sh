@@ -47,7 +47,7 @@ PY
 echo "Fetching upstream caveman files from $UPSTREAM_REPO..."
 
 BASE_SKILL_UPSTREAM="$TMPDIR/caveman-SKILL.md"
-fetch_raw "caveman/SKILL.md" "$BASE_SKILL_UPSTREAM"
+fetch_raw "skills/caveman/SKILL.md" "$BASE_SKILL_UPSTREAM"
 
 python3 - <<'PY' "$BASE_SKILL_UPSTREAM" "$REPO_ROOT/caveman-system-prompt.md"
 from pathlib import Path
