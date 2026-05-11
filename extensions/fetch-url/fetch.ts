@@ -1,6 +1,6 @@
 
 
-export type ExtractionStage = "content-negotiation" | "jina-ai" | "markdown-new" | "defuddle"
+export type ExtractionStage = "content-negotiation" | "jina-ai" | "firecrawl" | "markdown-new" | "defuddle"
 
 export interface FetchResult {
   title: string
@@ -46,6 +46,33 @@ async function tryJinaReader(url: string): Promise<string | null> {
     if (!res.ok) return null
     const json = await res.json()
     const content = json?.data?.content
+    return typeof content === "string" ? content.trim() || null : null
+  } catch {
+    return null
+  }
+}
+
+/** Try Firecrawl scrape API. */
+async function tryFirecrawl(url: string): Promise<string | null> {
+  const apiKey = process.env.PI_WEB_FETCH_FIRECRAWL_API_KEY
+  if (!apiKey) return null
+
+  try {
+    const res = await fetchWithTimeout(
+      "https://api.firecrawl.dev/v2/scrape",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url, formats: ["markdown"], onlyCleanContent: true }),
+      },
+      30_000,
+    )
+    if (!res.ok) return null
+    const json = await res.json()
+    const content = json?.data?.markdown
     return typeof content === "string" ? content.trim() || null : null
   } catch {
     return null
@@ -123,7 +150,20 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
     }
   }
 
-  // 3. Try markdown.new proxy
+  // 3. Try Firecrawl
+  const firecrawl = await tryFirecrawl(url)
+  if (firecrawl) {
+    return {
+      title: extractTitle(firecrawl, url),
+      content: firecrawl,
+      byline: "",
+      length: firecrawl.length,
+      url,
+      stage: "firecrawl",
+    }
+  }
+
+  // 4. Try markdown.new proxy
   const mdNew = await tryMarkdownNew(url)
   if (mdNew) {
     return {
@@ -136,7 +176,7 @@ export async function fetchAndExtract(url: string): Promise<FetchResult> {
     }
   }
 
-  // 4. HTML → Defuddle
+  // 5. HTML → Defuddle
   const [{ Defuddle }, { JSDOM }] = await Promise.all([
     import("defuddle/node"),
     import("jsdom"),
