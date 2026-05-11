@@ -31,12 +31,21 @@ export const you: Extractor = {
       if (options?.rawHtml) {
         const html = item?.html
         if (typeof html !== "string") return null
-        return { markdown: "", html: html.trim(), title: item?.title }
+        return {
+          markdown: "",
+          html: html.trim(),
+          title: item?.title,
+          metadata: item?.title ? { title: item.title } : undefined,
+        }
       }
 
       const markdown = item?.markdown
       if (typeof markdown !== "string") return null
-      return { markdown: markdown.trim(), title: item?.title }
+      return {
+        markdown: markdown.trim(),
+        title: item?.title,
+        metadata: item?.title ? { title: item.title } : undefined,
+      }
     } catch {
       return null
     }

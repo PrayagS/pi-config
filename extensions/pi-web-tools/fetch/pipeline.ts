@@ -94,12 +94,15 @@ async function defuddleHtml(url: string): Promise<FetchResult> {
 
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
 
-  const [{ Defuddle }, { JSDOM }] = await Promise.all([
+  const [{ Defuddle }, { JSDOM, VirtualConsole }] = await Promise.all([
     import("defuddle/node"),
     import("jsdom"),
   ])
+  const vc = new VirtualConsole()
+  vc.on("error", () => {})
+  vc.on("jsdomError", () => {})
   const rawHtml = await res.text()
-  const dom = new JSDOM(rawHtml, { url })
+  const dom = new JSDOM(rawHtml, { url, virtualConsole: vc })
   const defResult = await Defuddle(dom.window.document, url, {
     markdown: false,
     removeImages: true,
@@ -131,12 +134,15 @@ async function defuddleMarkdown(url: string): Promise<FetchResult> {
 
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
 
-  const [{ Defuddle }, { JSDOM }] = await Promise.all([
+  const [{ Defuddle }, { JSDOM, VirtualConsole }] = await Promise.all([
     import("defuddle/node"),
     import("jsdom"),
   ])
+  const vc = new VirtualConsole()
+  vc.on("error", () => {})
+  vc.on("jsdomError", () => {})
   const rawHtml = await res.text()
-  const dom = new JSDOM(rawHtml, { url })
+  const dom = new JSDOM(rawHtml, { url, virtualConsole: vc })
   const defResult = await Defuddle(dom.window.document, url, {
     markdown: true,
     removeImages: true,

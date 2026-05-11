@@ -33,7 +33,7 @@ export const parallel: Extractor = {
       // Store session_id for subsequent calls
       if (json?.session_id) sessionId = json.session_id
 
-      // Treat errors field as failure
+      // Treat non-empty errors array as failure
       if (json?.errors && Array.isArray(json.errors) && json.errors.length > 0) {
         return null
       }
@@ -43,7 +43,13 @@ export const parallel: Extractor = {
         result?.full_content ||
         (Array.isArray(result?.excerpts) ? result.excerpts.join("\n\n") : null)
       if (typeof markdown !== "string") return null
-      return { markdown: markdown.trim(), title: result?.title }
+      const metadata: Record<string, unknown> = {}
+      if (result?.title) metadata.title = result.title
+      return {
+        markdown: markdown.trim(),
+        title: result?.title,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      }
     } catch {
       return null
     }

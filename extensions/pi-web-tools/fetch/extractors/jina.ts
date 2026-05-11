@@ -34,7 +34,11 @@ export const jina: Extractor = {
 
       const content = json?.data?.content
       if (typeof content !== "string") return null
-      return { markdown: content.trim() }
+      const title = json?.data?.title
+      return {
+        markdown: content.trim(),
+        metadata: title ? { title } : undefined,
+      }
     } catch {
       return null
     }

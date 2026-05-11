@@ -28,10 +28,11 @@ export const webFetchTool = {
         const { text, details } = await truncateToTemp(out, params.url, {
           method: "domain-handler",
         })
-        return {
+        const result = {
           content: [{ type: "text" as const, text, source: "domain-handler" }],
           details,
         }
+        return result
       }
     }
 

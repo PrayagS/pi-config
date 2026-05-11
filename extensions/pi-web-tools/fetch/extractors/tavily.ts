@@ -28,7 +28,11 @@ export const tavily: Extractor = {
 
       const content = json?.results?.[0]?.raw_content
       if (typeof content !== "string") return null
-      return { markdown: content.trim() }
+      const title = json?.results?.[0]?.title
+      return {
+        markdown: content.trim(),
+        metadata: title ? { title } : undefined,
+      }
     } catch {
       return null
     }

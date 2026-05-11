@@ -1,8 +1,11 @@
 import { Text } from "@mariozechner/pi-tui"
 
 export function renderCall(args: any, theme: any): typeof Text.prototype {
-  let text = theme.fg("toolTitle", theme.bold("web_fetch "))
-  text += theme.fg("accent", args.url || "...")
+  let text = theme.fg("toolTitle", theme.bold("web_fetch"))
+  text += ` ${theme.fg("accent", args.url || "...")}`
+  if (args.rawHtml) {
+    text += ` ${theme.fg("muted", "rawHtml")}`
+  }
   return new Text(text, 0, 0)
 }
 
@@ -35,11 +38,19 @@ export function renderResult(
     text += `\n${theme.fg("muted", `Full output: ${d.fullOutputPath}`)}`
   }
 
-  if (expanded) {
-    if (c?.type === "text") {
-      text += `\n\n${theme.fg("toolOutput", c.text.slice(0, 2000))}`
-      if (c.text.length > 2000)
-        text += theme.fg("muted", "\n... (truncated in preview)")
+  // Content preview (like read tool)
+  if (c?.type === "text" && c.text) {
+    const lines = c.text.split("\n")
+    const maxLines = expanded ? lines.length : 5
+    const displayLines = lines.slice(0, maxLines)
+    const remaining = lines.length - displayLines.length
+
+    if (displayLines.length > 0) {
+      text += `\n\n${displayLines.map((l: string) => theme.fg("toolOutput", l)).join("\n")}`
+    }
+
+    if (remaining > 0 && !expanded) {
+      text += `\n${theme.fg("muted", `... (${remaining} more lines, expand for full)`)}`
     }
   }
 

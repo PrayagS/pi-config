@@ -34,7 +34,11 @@ export const exa: Extractor = {
       const result = json?.results?.[0]
       const text = result?.text
       if (typeof text !== "string") return null
-      return { markdown: text.trim(), title: result?.title }
+      return {
+        markdown: text.trim(),
+        title: result?.title,
+        metadata: result?.title ? { title: result.title } : undefined,
+      }
     } catch {
       return null
     }
