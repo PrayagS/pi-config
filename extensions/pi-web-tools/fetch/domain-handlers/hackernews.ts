@@ -18,7 +18,10 @@ interface HNItem {
   descendants?: number
 }
 
-async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T | null> {
+async function fetchJson<T>(
+  url: string,
+  signal?: AbortSignal
+): Promise<T | null> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
@@ -37,13 +40,24 @@ async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T | null
   }
 }
 
-async function fetchItem(id: number, signal?: AbortSignal): Promise<HNItem | null> {
+async function fetchItem(
+  id: number,
+  signal?: AbortSignal
+): Promise<HNItem | null> {
   return fetchJson<HNItem>(`${API_BASE}/item/${id}.json`, signal)
 }
 
-async function fetchItems(ids: number[], limit: number, signal?: AbortSignal): Promise<HNItem[]> {
-  const results = await Promise.all(ids.slice(0, limit).map(id => fetchItem(id, signal)))
-  return results.filter((item): item is HNItem => item !== null && !item.deleted && !item.dead)
+async function fetchItems(
+  ids: number[],
+  limit: number,
+  signal?: AbortSignal
+): Promise<HNItem[]> {
+  const results = await Promise.all(
+    ids.slice(0, limit).map((id) => fetchItem(id, signal))
+  )
+  return results.filter(
+    (item): item is HNItem => item !== null && !item.deleted && !item.dead
+  )
 }
 
 function decodeHNText(html: string): string {
@@ -71,14 +85,20 @@ function formatTimeAgo(unixTime: number): string {
   return `${Math.floor(diff / (1000 * 60))}m ago`
 }
 
-async function renderStory(item: HNItem, signal?: AbortSignal, depth = 0): Promise<string> {
+async function renderStory(
+  item: HNItem,
+  signal?: AbortSignal,
+  depth = 0
+): Promise<string> {
   const lines: string[] = []
 
   if (depth === 0) {
     lines.push(`# ${item.title || "HN Story"}`)
     lines.push("")
     if (item.url) lines.push(`**URL:** ${item.url}`)
-    lines.push(`**Posted by:** ${item.by || "?"} · **Score:** ${item.score ?? 0} · **Time:** ${formatTimeAgo(item.time ?? 0)}`)
+    lines.push(
+      `**Posted by:** ${item.by || "?"} · **Score:** ${item.score ?? 0} · **Time:** ${formatTimeAgo(item.time ?? 0)}`
+    )
     if (item.descendants) lines.push(`**Comments:** ${item.descendants}`)
     lines.push("")
   }
@@ -103,7 +123,9 @@ async function renderStory(item: HNItem, signal?: AbortSignal, depth = 0): Promi
       for (const comment of comments) {
         const indent = "  ".repeat(depth)
         const score = comment.score !== undefined ? ` [${comment.score}]` : ""
-        lines.push(`${indent}**${comment.by || "?"}** (${formatTimeAgo(comment.time ?? 0)})${score}`)
+        lines.push(
+          `${indent}**${comment.by || "?"}** (${formatTimeAgo(comment.time ?? 0)})${score}`
+        )
         lines.push("")
 
         if (comment.text) {
@@ -125,7 +147,11 @@ async function renderStory(item: HNItem, signal?: AbortSignal, depth = 0): Promi
   return lines.join("\n")
 }
 
-async function renderListing(ids: number[], title: string, signal?: AbortSignal): Promise<string> {
+async function renderListing(
+  ids: number[],
+  title: string,
+  signal?: AbortSignal
+): Promise<string> {
   const stories = await fetchItems(ids, 20, signal)
 
   const lines = [`# ${title}`, ""]
@@ -135,7 +161,9 @@ async function renderListing(ids: number[], title: string, signal?: AbortSignal)
     const comments = story.descendants ? ` | ${story.descendants} comments` : ""
     lines.push(`${i + 1}. **${story.title}**`)
     if (story.url) lines.push(`   ${story.url}`)
-    lines.push(`   ${story.score ?? 0} points by ${story.by || "?"} | ${formatTimeAgo(story.time ?? 0)}${comments}`)
+    lines.push(
+      `   ${story.score ?? 0} points by ${story.by || "?"} | ${formatTimeAgo(story.time ?? 0)}${comments}`
+    )
     lines.push(`   https://news.ycombinator.com/item?id=${story.id}`)
     lines.push("")
   }
@@ -146,7 +174,10 @@ async function renderListing(ids: number[], title: string, signal?: AbortSignal)
 /**
  * Handle Hacker News URLs via the official Firebase API.
  */
-export const handleHackerNews: DomainHandler = async (url: string, signal?: AbortSignal) => {
+export const handleHackerNews: DomainHandler = async (
+  url: string,
+  signal?: AbortSignal
+) => {
   let parsed: URL
   try {
     parsed = new URL(url)
@@ -182,7 +213,10 @@ export const handleHackerNews: DomainHandler = async (url: string, signal?: Abor
   }
 
   if (parsed.pathname === "/best") {
-    const ids = await fetchJson<number[]>(`${API_BASE}/beststories.json`, signal)
+    const ids = await fetchJson<number[]>(
+      `${API_BASE}/beststories.json`,
+      signal
+    )
     if (!ids) return null
     return await renderListing(ids, "Hacker News — Best", signal)
   }

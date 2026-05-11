@@ -24,7 +24,7 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/caveman/` — response-style control with `/caveman`
 - `extensions/commit/` — `/commit` command that prefetches VCS context and asks the agent to commit
 - `extensions/custom-provider-bedrock-inference-profiles/` — Bedrock inference profile support
-- `extensions/web-fetch/` — fetch URL content as clean Markdown
+- `extensions/pi-web-tools/` — `web_search` (Kagi) and `web_fetch` (URL → Markdown)
 - `extensions/interactive-shell/` — interactive shell integration
 - `extensions/notify/` — notifications
 - `extensions/pi-co-authored-by/` — append AI trailers to git/jj commits
@@ -34,7 +34,6 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/questionnaire/` — structured question UI tool
 - `extensions/sandbox/` — command sandboxing
 - `extensions/tools/` — tooling controls
-- `extensions/web-search/` — web search tool
 - `extensions/working-indicator/` — phase-aware working spinner (thinking/tool/streaming/working)
 - `extensions/pi-images/` — image attachments with kitty graphics preview ([credits](extensions/pi-images/README.md#credits))
 - `extensions/pi-spawn-claude-code/` — `claude` tool for spawning Claude Code CLI in background or interactive tmux mode

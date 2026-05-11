@@ -1,0 +1,37 @@
+import { fetchWithTimeout } from "./http"
+import type { Extractor } from "./types"
+
+export const firecrawl: Extractor = {
+  name: "firecrawl",
+  async extract(url) {
+    const apiKey = process.env.PI_WEB_FETCH_FIRECRAWL_API_KEY
+    if (!apiKey) return null
+    try {
+      const res = await fetchWithTimeout(
+        "https://api.firecrawl.dev/v2/scrape",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ url, formats: ["markdown"] }),
+        },
+        30_000
+      )
+      if (!res.ok) return null
+      const json = await res.json()
+      const data = json?.data
+      const markdown = data?.markdown
+      if (typeof markdown !== "string") return null
+      const meta = data?.metadata
+      const metadata: Record<string, unknown> = {}
+      if (meta?.title) metadata.title = meta.title
+      if (meta?.cacheState) metadata.cacheState = meta.cacheState
+      if (meta?.cachedAt) metadata.cachedAt = meta.cachedAt
+      return { markdown: markdown.trim(), metadata }
+    } catch {
+      return null
+    }
+  },
+}

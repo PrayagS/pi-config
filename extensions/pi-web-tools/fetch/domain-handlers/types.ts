@@ -6,5 +6,5 @@
  */
 export type DomainHandler = (
   url: string,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ) => Promise<string | null>

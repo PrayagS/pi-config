@@ -32,7 +32,7 @@ async function fetchJson(url: string, signal?: AbortSignal): Promise<any> {
 
     const res = await fetch(url, {
       signal: effectiveSignal,
-      headers: { "User-Agent": "pi-web-fetch/1.0" },
+      headers: { "User-Agent": "pi-web-tools/1.0" },
     })
     if (!res.ok) return null
     return await res.json()
@@ -65,7 +65,10 @@ function cleanRedditHtml(html: string): string {
  * Appending .json to any Reddit URL returns structured JSON data.
  * No auth required, no rate limiting for simple fetches.
  */
-export const handleReddit: DomainHandler = async (url: string, signal?: AbortSignal) => {
+export const handleReddit: DomainHandler = async (
+  url: string,
+  signal?: AbortSignal
+) => {
   let parsed: URL
   try {
     parsed = new URL(url)
@@ -88,12 +91,16 @@ export const handleReddit: DomainHandler = async (url: string, signal?: AbortSig
 
   // Post page: data is an array [postData, commentsData]
   if (Array.isArray(data) && data.length >= 1) {
-    const postData = data[0]?.data?.children?.[0]?.data as RedditPost | undefined
+    const postData = data[0]?.data?.children?.[0]?.data as
+      | RedditPost
+      | undefined
 
     if (postData) {
       lines.push(`# ${postData.title}`)
       lines.push("")
-      lines.push(`**r/${postData.subreddit}** · u/${postData.author} · ${postData.score} points · ${postData.num_comments} comments`)
+      lines.push(
+        `**r/${postData.subreddit}** · u/${postData.author} · ${postData.score} points · ${postData.num_comments} comments`
+      )
       lines.push(`*${formatDate(postData.created_utc)}*`)
       lines.push("")
 
@@ -143,7 +150,9 @@ export const handleReddit: DomainHandler = async (url: string, signal?: AbortSig
     lines.push("")
 
     for (const post of posts) {
-      lines.push(`- **${post.title}** (${post.score} pts, ${post.num_comments} comments)`)
+      lines.push(
+        `- **${post.title}** (${post.score} pts, ${post.num_comments} comments)`
+      )
       lines.push(`  by u/${post.author}`)
       lines.push("")
     }

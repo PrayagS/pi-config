@@ -5,7 +5,17 @@ import type { DomainHandler } from "./types"
  * Returns null if the URL is not a GitHub link we handle.
  */
 interface GitHubUrl {
-  kind: "repo" | "blob" | "tree" | "raw-blob" | "issue" | "issues" | "pull" | "pulls" | "gist" | "gist-file"
+  kind:
+    | "repo"
+    | "blob"
+    | "tree"
+    | "raw-blob"
+    | "issue"
+    | "issues"
+    | "pull"
+    | "pulls"
+    | "gist"
+    | "gist-file"
   owner: string
   repo: string
   ref?: string
@@ -277,7 +287,10 @@ function buildGhInstructions(gh: GitHubUrl): string {
  *
  * raw.githubusercontent.com URLs pass through to normal fetch.
  */
-export const handleGitHub: DomainHandler = async (url: string, _signal?: AbortSignal) => {
+export const handleGitHub: DomainHandler = async (
+  url: string,
+  _signal?: AbortSignal
+) => {
   const gh = parseGitHubUrl(url)
   if (!gh) return null
 

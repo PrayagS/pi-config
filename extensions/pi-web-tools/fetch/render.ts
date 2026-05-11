@@ -6,14 +6,20 @@ export function renderCall(args: any, theme: any): typeof Text.prototype {
   return new Text(text, 0, 0)
 }
 
-export function renderResult(result: any, { expanded }: { expanded: boolean }, theme: any): typeof Text.prototype {
+export function renderResult(
+  result: any,
+  { expanded }: { expanded: boolean },
+  theme: any
+): typeof Text.prototype {
   const d = result.details
   const c = result.content?.[0]
   if (d?.error) return new Text(theme.fg("error", `✗ ${d.error}`), 0, 0)
 
   let text = theme.fg("success", "✓ ")
-  if (d?.title) text += theme.fg("toolTitle", d.title) + " "
-  const source = c?.source ?? (d?.method === "domain-handler" ? "domain-handler" : d?.stage ?? "?")
+  if (d?.title) text += `${theme.fg("toolTitle", d.title)} `
+  const source =
+    c?.source ??
+    (d?.method === "domain-handler" ? "domain-handler" : (d?.stage ?? "?"))
   text += theme.fg("muted", `(${source}`)
   if (d?.truncated) text += theme.fg("warning", ", truncated")
   text += theme.fg("muted", `, ${d?.totalLines ?? "?"} lines)`)
@@ -22,17 +28,18 @@ export function renderResult(result: any, { expanded }: { expanded: boolean }, t
     const meta = Object.entries(c.metadata)
       .map(([k, v]) => `${k}=${v}`)
       .join(" | ")
-    text += "\n" + theme.fg("muted", `  ${meta}`)
+    text += `\n${theme.fg("muted", `  ${meta}`)}`
   }
 
   if (d?.fullOutputPath) {
-    text += "\n" + theme.fg("muted", `Full output: ${d.fullOutputPath}`)
+    text += `\n${theme.fg("muted", `Full output: ${d.fullOutputPath}`)}`
   }
 
   if (expanded) {
     if (c?.type === "text") {
-      text += "\n\n" + theme.fg("toolOutput", c.text.slice(0, 2000))
-      if (c.text.length > 2000) text += theme.fg("muted", "\n... (truncated in preview)")
+      text += `\n\n${theme.fg("toolOutput", c.text.slice(0, 2000))}`
+      if (c.text.length > 2000)
+        text += theme.fg("muted", "\n... (truncated in preview)")
     }
   }
 
