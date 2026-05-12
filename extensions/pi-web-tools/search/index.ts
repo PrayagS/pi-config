@@ -9,13 +9,14 @@ export function createWebSearchTool(pi: ExtensionAPI) {
   return {
     name: "web_search" as const,
     label: "Web Search",
+    promptSnippet:
+      "Search web for current information or docs. Supports multiple parallel queries and allows filtering results by age and website domains. Fetching page contents for search results is also supported.",
     description:
-      'Search the web using the configured multi-provider pipeline (Kagi, Firecrawl, Tavily, Parallel, Exa, You.com). Accepts one or more queries and runs them in parallel. Results are numbered continuously across all queries. Use this when you need current information, facts from the internet, or documentation. Include essential context within each query so each one is self-contained. Common search operators can be embedded directly in the query string: site:example.com (restrict to a site), filetype:pdf (filter by file type), inurl:term (URL must contain term), intitle:term (title must contain term), "exact phrase" (exact match), -term (exclude), OR / AND (boolean).',
+      "Search the web for current information, facts from the internet, or documentation. Args: queries (one or more self-contained search queries, run in parallel), limit (max results per query, default 10, max 50), age (day/week/month/year), includeDomains (restrict results to domains), excludeDomains (exclude domains; cannot be combined with includeDomains), includeContent (request provider-supported page content in results). Results are numbered continuously across all queries.",
     parameters: Type.Object({
       queries: Type.Array(
         Type.String({
-          description:
-            'A search query. Common operators (site:, filetype:, inurl:, intitle:, "exact phrase", -exclude, OR, AND) can be embedded directly; support varies by provider.',
+          description: "A self-contained search query with enough context to stand alone.",
         }),
         {
           description:

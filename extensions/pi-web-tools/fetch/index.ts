@@ -8,15 +8,15 @@ import { validateFetchUrl } from "./url-safety"
 export const webFetchTool = {
   name: "web_fetch" as const,
   label: "Web Fetch",
+  promptSnippet: "Fetch URL content as clean Markdown or raw HTML",
   description:
-    "Fetch a URL and return clean, readable content as Markdown. Prefers markdown via content negotiation; falls back to Defuddle for HTML. Output is truncated to agent limits. If truncated, full output is saved to a temp file — use the read tool to page through it.",
+    "Fetch a URL and return clean, readable content as Markdown, or raw HTML when requested. Output is truncated to agent limits. If truncated, full output is saved to a temp file — use the read tool to page through it.",
   parameters: Type.Object({
     url: Type.String({ description: "URL to fetch" }),
     rawHtml: Type.Optional(
       Type.Boolean({
         default: false,
-        description:
-          "Return raw HTML instead of Markdown. Uses jina → firecrawl (rawHtml) → you (html) → Defuddle (HTML). Default: false.",
+        description: "Return raw HTML instead of Markdown. Default: false.",
       })
     ),
   }),

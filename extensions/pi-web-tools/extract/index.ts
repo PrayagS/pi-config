@@ -36,6 +36,7 @@ export function createWebExtractTool(pi: ExtensionAPI) {
   return {
     name: "web_extract" as const,
     label: "Web Extract",
+    promptSnippet: "Extract summaries or targeted facts from URLs",
     description:
       "Extract summaries or targeted information from up to 5 URLs. Use summary mode to understand pages. Use targeted mode with a prompt to pull specific facts or evidence from pages.",
     parameters,
