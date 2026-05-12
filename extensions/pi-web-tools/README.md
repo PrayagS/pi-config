@@ -147,3 +147,8 @@ Provider credentials reuse existing environment variables:
 - `PI_WEB_FETCH_PARALLEL_API_KEY`
 - `PI_WEB_FETCH_TAVILY_API_KEY`
 
+## Future work
+
+- Add a small session-local `web_fetch` page cache with TTL/LRU behavior to avoid repeated provider calls for the same URL.
+- Ship a `web-research` skill documenting the recommended search → fetch → extract workflow.
+
