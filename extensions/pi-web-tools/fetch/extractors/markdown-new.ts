@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "./http"
+import { fetchWithTimeout } from "../../providers/http"
 import type { Extractor } from "./types"
 
 export const markdownNew: Extractor = {

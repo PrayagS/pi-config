@@ -1,4 +1,4 @@
-import { fetchJson } from "../extractors/http"
+import { fetchJson } from "../../providers/http"
 import type { DomainHandler } from "./types"
 
 interface RedditPost {

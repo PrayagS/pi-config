@@ -1,14 +1,23 @@
 # pi-web-tools
 
-Pi extension providing `web_search` and `web_fetch` tools.
+Pi extension providing `web_search`, `web_fetch`, and `web_extract` tools.
 
 ## Structure
 
 ```
-├── index.ts                  # extension entry — registers both tools
+├── index.ts                  # extension entry — registers tools
+├── providers/                # shared provider API clients
+│   ├── http.ts               #   fetchWithTimeout + fetchJson + postJson
+│   ├── kagi.ts               #   Kagi CLI argument builder
+│   ├── firecrawl.ts          #   Firecrawl scrape client
+│   ├── exa.ts                #   Exa contents client
+│   ├── parallel.ts           #   Parallel extract client + session reuse
+│   ├── tavily.ts             #   Tavily extract client
+│   ├── jina.ts               #   Jina Reader client
+│   └── you.ts                #   You.com contents client
 ├── search/                   # web_search tool
 │   ├── index.ts              #   createWebSearchTool factory + execute
-│   ├── kagi.ts               #   Kagi CLI args + result formatting
+│   ├── kagi.ts               #   Kagi result formatting
 │   ├── render.ts             #   render functions
 │   └── types.ts              #   Kagi response/tool detail types
 ├── fetch/                    # web_fetch tool
@@ -19,14 +28,19 @@ Pi extension providing `web_search` and `web_fetch` tools.
 │   ├── result.ts             #   FetchResult types + result builder
 │   ├── render.ts             #   render functions
 │   ├── truncate.ts           #   truncation helper
-│   ├── extractors/           #   API content extractors — self-contained modules
+│   ├── extractors/           #   API content extractor adapters
 │   │   ├── index.ts          #     barrel + apiExtractors registry
 │   │   ├── types.ts          #     Extractor interface
-│   │   ├── http.ts           #     shared fetchWithTimeout + fetchJson
 │   │   ├── jina.ts → firecrawl.ts → parallel.ts → exa.ts → tavily.ts → you.ts
 │   │   └── markdown-new.ts
 │   ├── domain-handlers/      #   specialized handlers for GitHub, HN, Reddit
 │   └── test-handlers.ts      #   domain handler smoke tests
+├── extract/                  # web_extract tool
+│   ├── index.ts              #   webExtractTool config + validation
+│   ├── pipeline.ts           #   summary/targeted provider fallback orchestration
+│   ├── render.ts             #   TUI render functions
+│   ├── render-markdown.ts    #   markdown output formatting
+│   └── providers/            #   web_extract provider adapters
 ├── package.json
 └── README.md
 ```
@@ -74,6 +88,55 @@ Fetch a URL and return clean, readable Markdown content.
 
 Large outputs are truncated to Pi limits and saved to a temp file for paging.
 
+Set `PI_WEB_FETCH_STAGE` to force one fetch stage:
+
+- `content-negotiation`
+- `jina-ai`
+- `firecrawl`
+- `parallel`
+- `tavily`
+- `exa`
+- `you`
+- `markdown-new`
+- `defuddle`
+
 ### Parameters
 
 - `url` — URL to fetch
+
+## `web_extract`
+
+Extract summaries or targeted information from up to 5 URLs.
+
+### Parameters
+
+- `urls[]` — 1 to 5 URLs to extract from
+- `mode` — `summary` or `targeted`
+- `prompt?` — required for `targeted`, ignored for `summary`
+
+### Provider order
+
+- `summary`: Firecrawl → Exa
+- `targeted`: Exa → Parallel → Tavily
+
+Set `PI_WEB_EXTRACT_STAGE` to force one provider:
+
+- `summary`: `firecrawl`, `exa`
+- `targeted`: `exa`, `parallel`, `tavily`
+
+Firecrawl is single-URL only, so summary mode fans out one scrape request per URL before falling back to Exa for missing URLs.
+
+### Response mapping
+
+- Firecrawl summary → `data.summary`
+- Exa summary/targeted → `results[].summary`
+- Parallel targeted → `results[].excerpts[]`
+- Tavily targeted → `results[].raw_content`
+
+Provider credentials reuse existing environment variables:
+
+- `PI_WEB_FETCH_FIRECRAWL_API_KEY`
+- `PI_WEB_FETCH_EXA_API_KEY`
+- `PI_WEB_FETCH_PARALLEL_API_KEY`
+- `PI_WEB_FETCH_TAVILY_API_KEY`
+

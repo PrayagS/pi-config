@@ -1,46 +1,31 @@
-import { fetchWithTimeout } from "./http"
+import { getExaContents } from "../../providers/exa"
 import type { Extractor } from "./types"
 
 export const exa: Extractor = {
   name: "exa",
   async extract(url, signal) {
-    const apiKey = process.env.PI_WEB_FETCH_EXA_API_KEY
-    if (!apiKey) return null
-    try {
-      const res = await fetchWithTimeout(
-        "https://api.exa.ai/contents",
-        {
-          method: "POST",
-          headers: {
-            "x-api-key": apiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ ids: [url], text: { verbosity: "full" } }),
-          signal,
-        }
+    const json = await getExaContents(
+      { ids: [url], text: { verbosity: "full" } },
+      signal
+    )
+    if (!json) return null
+
+    // Treat any non-success status as failure
+    const statuses = json?.statuses
+    if (Array.isArray(statuses)) {
+      const ourStatus = statuses.find(
+        (s: any) => s?.id === url || s?.id === decodeURIComponent(url)
       )
-      if (!res.ok) return null
-      const json = await res.json()
+      if (!ourStatus || ourStatus.status !== "success") return null
+    }
 
-      // Treat any non-success status as failure
-      const statuses = json?.statuses
-      if (Array.isArray(statuses)) {
-        const ourStatus = statuses.find(
-          (s: any) => s?.id === url || s?.id === decodeURIComponent(url)
-        )
-        if (!ourStatus || ourStatus.status !== "success") return null
-      }
-
-      const result = json?.results?.[0]
-      const text = result?.text
-      if (typeof text !== "string") return null
-      return {
-        markdown: text.trim(),
-        title: result?.title,
-        metadata: result?.title ? { title: result.title } : undefined,
-      }
-    } catch {
-      return null
+    const result = json?.results?.[0]
+    const text = result?.text
+    if (typeof text !== "string") return null
+    return {
+      markdown: text.trim(),
+      title: result?.title,
+      metadata: result?.title ? { title: result.title } : undefined,
     }
   },
 }

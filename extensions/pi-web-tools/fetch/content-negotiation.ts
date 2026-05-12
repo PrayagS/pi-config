@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "./extractors/http"
+import { fetchWithTimeout } from "../providers/http"
 import { buildResult } from "./result"
 import type { FetchResult } from "./result"
 

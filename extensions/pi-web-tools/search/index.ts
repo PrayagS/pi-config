@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
 import { Type } from "@sinclair/typebox"
-import { buildSearchArgs, formatResults } from "./kagi"
+import { buildKagiSearchArgs } from "../providers/kagi"
+import { formatResults } from "./kagi"
 import { renderCall, renderResult } from "./render"
 import type { KagiResponse, KagiResult, WebSearchDetails } from "./types"
 
@@ -101,7 +102,7 @@ export function createWebSearchTool(pi: ExtensionAPI) {
       const filterOpts = { verbatim, region, time, fromDate, toDate, order }
       const settled = await Promise.allSettled(
         queries.map((q: string) =>
-          pi.exec("kagi", buildSearchArgs(q, filterOpts), {
+          pi.exec("kagi", buildKagiSearchArgs(q, filterOpts), {
             signal,
             timeout: TIMEOUT_MS,
           })
