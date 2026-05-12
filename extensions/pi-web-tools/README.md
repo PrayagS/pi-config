@@ -1,6 +1,6 @@
 # pi-web-tools
 
-Pi extension providing `web_search`, `web_fetch`, and `web_extract` tools.
+Pi extension providing `web_search`, `web_fetch`, and `web_extract` tools, plus a web-content untrusted-data system prompt guard when any of those tools are enabled.
 
 ## Structure
 
@@ -77,7 +77,9 @@ Kagi requires the `kagi` CLI to be installed and authenticated. API providers re
 
 ## `web_fetch`
 
-Fetch a URL and return clean, readable Markdown content.
+Fetch a URL and return clean, readable Markdown content, or raw HTML when requested.
+
+`web_fetch` validates URLs before fetching: only `http`/`https` are allowed, embedded credentials are rejected, and localhost/private/link-local/internal hosts are blocked.
 
 ### Extraction pipeline
 
@@ -110,6 +112,7 @@ Set `PI_WEB_FETCH_STAGE` to force one fetch stage:
 ### Parameters
 
 - `url` — URL to fetch
+- `rawHtml?` — return raw HTML instead of Markdown. Uses Jina AI Reader → Firecrawl `rawHtml` → You.com HTML → Defuddle HTML.
 
 ## `web_extract`
 
@@ -123,12 +126,12 @@ Extract summaries or targeted information from up to 5 URLs.
 
 ### Provider order
 
-- `summary`: Firecrawl → Exa
+- `summary`: Firecrawl → Exa → Kagi CLI
 - `targeted`: Exa → Parallel → Tavily
 
 Set `PI_WEB_EXTRACT_STAGE` to force one provider:
 
-- `summary`: `firecrawl`, `exa`
+- `summary`: `firecrawl`, `exa`, `kagi`
 - `targeted`: `exa`, `parallel`, `tavily`
 
 Firecrawl is single-URL only, so summary mode fans out one scrape request per URL before falling back to Exa for missing URLs.
@@ -137,6 +140,7 @@ Firecrawl is single-URL only, so summary mode fans out one scrape request per UR
 
 - Firecrawl summary → `data.summary`
 - Exa summary/targeted → `results[].summary`
+- Kagi summary → `data.markdown`
 - Parallel targeted → `results[].excerpts[]`
 - Tavily targeted → `results[].raw_content`
 
