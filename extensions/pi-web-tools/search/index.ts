@@ -1,23 +1,21 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
 import { Type } from "@sinclair/typebox"
-import { buildKagiSearchArgs } from "../providers/kagi"
 import { formatResults } from "./kagi"
+import { runWebSearch } from "./pipeline"
 import { renderCall, renderResult } from "./render"
-import type { KagiResponse, KagiResult, WebSearchDetails } from "./types"
-
-const TIMEOUT_MS = 15_000
+import type { WebSearchDetails } from "./types"
 
 export function createWebSearchTool(pi: ExtensionAPI) {
   return {
     name: "web_search" as const,
     label: "Web Search",
     description:
-      'Search the web using Kagi. Accepts one or more queries and runs them in parallel. Results are numbered continuously across all queries. Use this when you need current information, facts from the internet, or documentation. Include essential context within each query so each one is self-contained. Kagi supports search operators embedded directly in the query string: site:example.com (restrict to a site), filetype:pdf (filter by file type), inurl:term (URL must contain term), intitle:term (title must contain term), "exact phrase" (exact match), -term (exclude), OR / AND (boolean), * (wildcard).',
+      'Search the web using the configured multi-provider pipeline (Kagi, Firecrawl, Tavily, Parallel, Exa, You.com). Accepts one or more queries and runs them in parallel. Results are numbered continuously across all queries. Use this when you need current information, facts from the internet, or documentation. Include essential context within each query so each one is self-contained. Common search operators can be embedded directly in the query string: site:example.com (restrict to a site), filetype:pdf (filter by file type), inurl:term (URL must contain term), intitle:term (title must contain term), "exact phrase" (exact match), -term (exclude), OR / AND (boolean).',
     parameters: Type.Object({
       queries: Type.Array(
         Type.String({
           description:
-            'A search query. Kagi search operators (site:, filetype:, inurl:, intitle:, "exact phrase", -exclude, OR, AND) can be embedded directly.',
+            'A search query. Common operators (site:, filetype:, inurl:, intitle:, "exact phrase", -exclude, OR, AND) can be embedded directly; support varies by provider.',
         }),
         {
           description:
@@ -33,19 +31,7 @@ export function createWebSearchTool(pi: ExtensionAPI) {
           maximum: 50,
         })
       ),
-      verbatim: Type.Optional(
-        Type.Boolean({
-          description:
-            "When true, enables Kagi's verbatim search mode — matches the exact query as typed. Useful for specific strings, error messages, or exact titles.",
-        })
-      ),
-      region: Type.Optional(
-        Type.String({
-          description:
-            "Restrict results to a Kagi region code (e.g. 'us', 'gb', 'jp', 'de'). Use 'no_region' to disable geographic filtering.",
-        })
-      ),
-      time: Type.Optional(
+      age: Type.Optional(
         Type.Union(
           [
             Type.Literal("day"),
@@ -55,35 +41,27 @@ export function createWebSearchTool(pi: ExtensionAPI) {
           ],
           {
             description:
-              "Restrict results to a recent time window. Cannot be combined with fromDate/toDate.",
+              "Restrict results to content from the last day, week, month, or year where supported.",
           }
         )
       ),
-      fromDate: Type.Optional(
-        Type.String({
+      includeDomains: Type.Optional(
+        Type.Array(Type.String(), {
           description:
-            "Restrict results to pages updated on or after this date (YYYY-MM-DD). Cannot be combined with time.",
+            "Restrict results to these domains. Cannot be combined with excludeDomains.",
         })
       ),
-      toDate: Type.Optional(
-        Type.String({
+      excludeDomains: Type.Optional(
+        Type.Array(Type.String(), {
           description:
-            "Restrict results to pages updated on or before this date (YYYY-MM-DD). Cannot be combined with time.",
+            "Exclude results from these domains. Cannot be combined with includeDomains.",
         })
       ),
-      order: Type.Optional(
-        Type.Union(
-          [
-            Type.Literal("default"),
-            Type.Literal("recency"),
-            Type.Literal("website"),
-            Type.Literal("trackers"),
-          ],
-          {
-            description:
-              "Reorder search results. Use 'recency' for most recent first.",
-          }
-        )
+      includeContent: Type.Optional(
+        Type.Boolean({
+          description:
+            "When true, request provider-supported page content from search results. Uses Firecrawl markdown, Tavily markdown, Parallel excerpts, Exa summaries, and You.com markdown; unsupported providers are skipped.",
+        })
       ),
     }),
 
@@ -91,75 +69,74 @@ export function createWebSearchTool(pi: ExtensionAPI) {
       const {
         queries,
         limit = 10,
-        verbatim,
-        region,
-        time,
-        fromDate,
-        toDate,
-        order,
+        age,
+        includeDomains,
+        excludeDomains,
+        includeContent,
       } = params
 
-      const filterOpts = { verbatim, region, time, fromDate, toDate, order }
-      const settled = await Promise.allSettled(
-        queries.map((q: string) =>
-          pi.exec("kagi", buildKagiSearchArgs(q, filterOpts), {
-            signal,
-            timeout: TIMEOUT_MS,
-          })
-        )
-      )
-
-      if (signal?.aborted) {
+      if (includeDomains?.length && excludeDomains?.length) {
         return {
-          content: [{ type: "text" as const, text: "Search was cancelled." }],
+          content: [
+            {
+              type: "text" as const,
+              text: "Search failed: includeDomains and excludeDomains cannot be combined.",
+            },
+          ],
           details: {
             queries,
             limit,
             resultCount: 0,
-            error: "cancelled",
+            error: "includeDomains and excludeDomains cannot be combined",
           } as WebSearchDetails,
           isError: true,
         }
       }
 
-      const resultSets: KagiResult[][] = []
-      const errors: string[] = []
-
-      for (let i = 0; i < settled.length; i++) {
-        const s = settled[i]
-        if (s.status === "rejected") {
-          errors.push(
-            `Query "${queries[i]}": ${s.reason?.message ?? String(s.reason)}`
-          )
-          resultSets.push([])
-          continue
-        }
-
-        const { stdout, stderr, code } = s.value
-        if (code !== 0) {
-          errors.push(
-            `Query "${queries[i]}": ${stderr.trim() || `exit code ${code}`}`
-          )
-          resultSets.push([])
-          continue
-        }
-
-        try {
-          const response = JSON.parse(stdout) as KagiResponse
-          const results = (response.data ?? []).filter(
-            (item): item is KagiResult => item.t === 0
-          )
-          resultSets.push(results.slice(0, limit))
-        } catch (e: any) {
-          errors.push(
-            `Query "${queries[i]}": failed to parse response — ${e.message}`
-          )
-          resultSets.push([])
+      let output
+      try {
+        output = await runWebSearch(
+          pi,
+          {
+            queries,
+            limit,
+            age,
+            includeDomains,
+            excludeDomains,
+            includeContent,
+              },
+          signal
+        )
+      } catch (e: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: signal?.aborted
+                ? "Search was cancelled."
+                : `Search failed: ${e?.message ?? String(e)}`,
+            },
+          ],
+          details: {
+            queries,
+            limit,
+            resultCount: 0,
+            error: signal?.aborted ? "cancelled" : e?.message ?? String(e),
+          } as WebSearchDetails,
+          isError: true,
         }
       }
 
+      const { resultSets, errors } = output
+
       const totalCount = resultSets.reduce((sum, r) => sum + r.length, 0)
       const allUrls = resultSets.flatMap((r) => r.map((item) => item.url))
+      const sources = output.queryOutputs.reduce<Record<string, number>>((acc, queryOutput) => {
+        if (queryOutput.source && queryOutput.results.length > 0) {
+          acc[queryOutput.source] = (acc[queryOutput.source] ?? 0) + queryOutput.results.length
+        }
+        return acc
+      }, {})
 
       if (totalCount === 0 && errors.length === 0) {
         return {
@@ -175,7 +152,6 @@ export function createWebSearchTool(pi: ExtensionAPI) {
 
       let text = formatResults(queries, resultSets)
       if (errors.length > 0) text += "\n\nErrors:\n" + errors.join("\n")
-
       return {
         content: [{ type: "text" as const, text }],
         details: {
@@ -183,6 +159,7 @@ export function createWebSearchTool(pi: ExtensionAPI) {
           limit,
           resultCount: totalCount,
           urls: allUrls,
+          sources,
         } as WebSearchDetails,
       }
     },

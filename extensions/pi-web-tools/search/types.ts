@@ -1,10 +1,14 @@
-export interface KagiResult {
-  t: 0
-  rank: number
+export interface WebSearchResult {
   title: string
   url: string
   snippet?: string
   published?: string | null
+  source?: string
+}
+
+export interface KagiResult extends WebSearchResult {
+  t: 0
+  rank: number
 }
 
 export interface KagiRelated {
@@ -16,13 +20,13 @@ export interface KagiResponse {
   data: Array<KagiResult | KagiRelated>
 }
 
+export type SearchAge = "day" | "week" | "month" | "year"
+
 export interface SearchFilters {
-  verbatim?: boolean
-  region?: string
-  time?: string
-  fromDate?: string
-  toDate?: string
-  order?: string
+  age?: SearchAge
+  includeDomains?: string[]
+  excludeDomains?: string[]
+  includeContent?: boolean
 }
 
 export interface WebSearchDetails {
@@ -30,5 +34,6 @@ export interface WebSearchDetails {
   limit: number
   resultCount: number
   urls?: string[]
+  sources?: Record<string, number>
   error?: string
 }

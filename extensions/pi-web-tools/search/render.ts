@@ -7,12 +7,10 @@ export function renderCall(args: any, theme: any): typeof Text.prototype {
   text += theme.fg("accent", qs || "...")
 
   const tags: string[] = []
-  if (args.verbatim) tags.push("verbatim")
-  if (args.region) tags.push(`region:${args.region}`)
-  if (args.time) tags.push(`time:${args.time}`)
-  if (args.fromDate || args.toDate)
-    tags.push(`${args.fromDate ?? "…"}→${args.toDate ?? "…"}`)
-  if (args.order && args.order !== "default") tags.push(`order:${args.order}`)
+  if (args.age) tags.push(`age:${args.age}`)
+  if (args.includeDomains?.length) tags.push(`include:${args.includeDomains.join(",")}`)
+  if (args.excludeDomains?.length) tags.push(`exclude:${args.excludeDomains.join(",")}`)
+  if (args.includeContent) tags.push("content")
   if (args.limit) tags.push(`limit:${args.limit}`)
   if (tags.length > 0) text += " " + theme.fg("dim", tags.join(" "))
 
@@ -31,9 +29,18 @@ export function renderResult(
   }
 
   let text = theme.fg("success", "✓ ")
-  text += theme.fg("muted", `${details?.resultCount ?? "?"} results`)
+  text += theme.fg("toolTitle", "web_search")
+  text += theme.fg("muted", ` (${details?.resultCount ?? "?"} results`)
   if ((details?.queries?.length ?? 0) > 1) {
     text += theme.fg("dim", ` across ${details!.queries.length} queries`)
+  }
+  text += theme.fg("muted", ")")
+
+  if (details?.sources && Object.keys(details.sources).length > 0) {
+    const sources = Object.entries(details.sources)
+      .map(([source, count]) => `${source}=${count}`)
+      .join(" | ")
+    text += `\n${theme.fg("muted", `  ${sources}`)}`
   }
 
   if (expanded) {

@@ -54,19 +54,26 @@ Pi extension providing `web_search`, `web_fetch`, and `web_extract` tools.
 
 ## `web_search`
 
-Search the web using the Kagi CLI. Runs one or more queries in parallel and returns numbered result blocks with title, URL, published date, and snippet.
+Search the web using a multi-provider pipeline. Runs one or more queries in parallel and returns numbered result blocks with title, URL, provider source, published date, and snippet.
+
+Provider order: Parallel → Exa → Kagi CLI → You.com → Firecrawl → Tavily. Each API provider self-skips when its API key env var is missing. Set `PI_WEB_SEARCH_STAGE` to force one provider: `parallel`, `exa`, `kagi`, `you`, `firecrawl`, or `tavily`.
 
 ### Parameters
 
 - `queries[]` — search queries (supports Kagi operators: site:, filetype:, intitle:, etc.)
 - `limit?` — max results per query (default 10, max 50)
-- `verbatim?` — exact match mode
-- `region?` — region code (e.g. `us`, `gb`)
-- `time?` — `day`, `week`, `month`, `year`
-- `fromDate?` / `toDate?` — date range (YYYY-MM-DD)
-- `order?` — `default`, `recency`, `website`, `trackers`
+- `age?` — restrict result age where supported: `day`, `week`, `month`, `year` (Kagi, Firecrawl, Tavily, Parallel, Exa, You.com)
+- `includeDomains?` — restrict results to these domains (Kagi query operators, Firecrawl, Tavily, Parallel, Exa, You.com)
+- `excludeDomains?` — exclude results from these domains (Kagi query operators, Firecrawl, Tavily, Parallel, Exa, You.com)
+- `includeContent?` — include provider-supported page content in result snippets; uses Firecrawl markdown, Tavily markdown, Parallel excerpts, Exa summaries, and You.com markdown. Kagi is skipped when enabled.
 
-Requires the `kagi` CLI to be installed and authenticated.
+Kagi requires the `kagi` CLI to be installed and authenticated. API providers reuse existing web fetch credentials:
+
+- `PI_WEB_FETCH_FIRECRAWL_API_KEY`
+- `PI_WEB_FETCH_TAVILY_API_KEY`
+- `PI_WEB_FETCH_PARALLEL_API_KEY`
+- `PI_WEB_FETCH_EXA_API_KEY`
+- `PI_WEB_FETCH_YOU_API_KEY`
 
 ## `web_fetch`
 

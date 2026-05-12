@@ -1,8 +1,8 @@
-import type { KagiResult } from "./types"
+import type { WebSearchResult } from "./types"
 
 export function formatResults(
   queries: string[],
-  resultSets: KagiResult[][]
+  resultSets: WebSearchResult[][]
 ): string {
   const sections: string[] = []
   let counter = 1
@@ -14,6 +14,7 @@ export function formatResults(
         const lines = [
           `${counter++}: ${r.title}`,
           r.url,
+          `Source: ${r.source ?? "unknown"}`,
           `Published: ${r.published ?? "N/A"}`,
           r.snippet ?? "No snippet available",
         ]
