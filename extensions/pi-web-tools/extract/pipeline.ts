@@ -1,22 +1,14 @@
 import { extractExa } from "./providers/exa"
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
 import { extractFirecrawlSummary } from "./providers/firecrawl"
+import { createKagiSummaryExtractor } from "./providers/kagi"
 import { extractParallelTargeted } from "./providers/parallel"
 import { extractTavilyTargeted } from "./providers/tavily"
 import type { WebExtractItem, WebExtractOutput, WebExtractProviderParams } from "./providers/types"
 
-const providersByName = {
-  firecrawl: extractFirecrawlSummary,
-  exa: extractExa,
-  parallel: extractParallelTargeted,
-  tavily: extractTavilyTargeted,
-}
-
-const summaryProviders = [extractFirecrawlSummary, extractExa]
-const targetedProviders = [extractExa, extractParallelTargeted, extractTavilyTargeted]
-const supportedStages = {
-  summary: ["firecrawl", "exa"],
-  targeted: ["exa", "parallel", "tavily"],
-}
+type WebExtractProvider = (
+  params: WebExtractProviderParams
+) => Promise<Array<WebExtractItem | null> | null>
 
 function pendingMask(results: WebExtractItem[]): boolean[] {
   return results.map((item) => !item.source)
@@ -30,6 +22,8 @@ function markMissing(results: WebExtractItem[]) {
 
 async function runEnvStage(
   params: Omit<WebExtractProviderParams, "pending" | "signal">,
+  providersByName: Record<string, WebExtractProvider>,
+  supportedStages: Record<string, string[]>,
   signal?: AbortSignal
 ): Promise<WebExtractOutput | null> {
   const envStage = process.env.PI_WEB_EXTRACT_STAGE
@@ -41,7 +35,7 @@ async function runEnvStage(
     )
   }
 
-  const provider = providersByName[envStage as keyof typeof providersByName]
+  const provider = providersByName[envStage]
   const providerResults = await provider({
     ...params,
     pending: params.urls.map(() => true),
@@ -62,10 +56,26 @@ async function runEnvStage(
 }
 
 export async function runWebExtract(
+  pi: ExtensionAPI,
   params: Omit<WebExtractProviderParams, "pending" | "signal">,
   signal?: AbortSignal
 ): Promise<WebExtractOutput> {
-  const envResult = await runEnvStage(params, signal)
+  const extractKagiSummary = createKagiSummaryExtractor(pi)
+  const providersByName = {
+    firecrawl: extractFirecrawlSummary,
+    exa: extractExa,
+    parallel: extractParallelTargeted,
+    tavily: extractTavilyTargeted,
+    kagi: extractKagiSummary,
+  }
+  const summaryProviders = [extractFirecrawlSummary, extractExa, extractKagiSummary]
+  const targetedProviders = [extractExa, extractParallelTargeted, extractTavilyTargeted]
+  const supportedStages = {
+    summary: ["firecrawl", "exa", "kagi"],
+    targeted: ["exa", "parallel", "tavily"],
+  }
+
+  const envResult = await runEnvStage(params, providersByName, supportedStages, signal)
   if (envResult) return envResult
 
   const results: WebExtractItem[] = params.urls.map((url) => ({ url }))

@@ -1,5 +1,5 @@
 export type WebExtractMode = "summary" | "targeted"
-export type WebExtractSource = "firecrawl" | "exa" | "parallel" | "tavily"
+export type WebExtractSource = "firecrawl" | "exa" | "parallel" | "tavily" | "kagi"
 
 export interface WebExtractProviderParams {
   urls: string[]
