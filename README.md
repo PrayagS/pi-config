@@ -27,6 +27,7 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/pi-web-tools/` — `web_search` (Kagi) and `web_fetch` (URL → Markdown)
 - `extensions/interactive-shell/` — interactive shell integration
 - `extensions/notify/` — notifications
+- `extensions/qmd-sessions-indexer/` — refresh qmd session search indexes on Pi session lifecycle events
 - `extensions/pi-co-authored-by/` — append AI trailers to git/jj commits
 - `extensions/pi-dcp/` — dynamic context pruning (automatic rules + LLM tools)
 - `extensions/pi-footer/` — footer/status UI tweaks
