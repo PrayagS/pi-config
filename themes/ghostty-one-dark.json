@@ -1,24 +1,24 @@
 {
-  "$schema": "https://raw.githubusercontent.com/badlogic/pi-mono/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
-  "name": "ghostty-sync-f4e5674f",
+  "$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
+  "name": "ghostty-sync-one-dark",
   "vars": {
-    "bg": "#1d2021",
-    "fg": "#ebdbb2",
-    "accent": "#b16286",
-    "accentAlt": "#689d6a",
-    "link": "#458588",
-    "error": "#cc241d",
-    "success": "#98971a",
-    "warning": "#d79921",
-    "muted": "#a39a7f",
-    "dim": "#7a7462",
-    "borderMuted": "#514f45",
-    "selectedBg": "#292c2d",
-    "userMsgBg": "#252829",
-    "toolPendingBg": "#222526",
-    "toolSuccessBg": "#2c2e20",
-    "toolErrorBg": "#322021",
-    "customMsgBg": "#292529"
+    "bg": "#21252b",
+    "fg": "#e6e6e6",
+    "accent": "#c88bda",
+    "accentAlt": "#62bac6",
+    "link": "#71b9f4",
+    "error": "#e27881",
+    "success": "#98c379",
+    "warning": "#eac786",
+    "muted": "#a1a2a5",
+    "dim": "#7a7c7f",
+    "borderMuted": "#52555a",
+    "selectedBg": "#2d3137",
+    "userMsgBg": "#292d33",
+    "toolPendingBg": "#262a30",
+    "toolSuccessBg": "#2f3834",
+    "toolErrorBg": "#382f35",
+    "customMsgBg": "#2e2d39"
   },
   "colors": {
     "accent": "accent",
@@ -74,8 +74,8 @@
     "bashMode": "success"
   },
   "export": {
-    "pageBg": "#151819",
-    "cardBg": "#1d2021",
-    "infoBg": "#332f21"
+    "pageBg": "#191d23",
+    "cardBg": "#21252b",
+    "infoBg": "#393836"
   }
 }
