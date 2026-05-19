@@ -42,20 +42,20 @@ const usageCache = new Map<string, UsageSnapshot>() // keyed by provider
 const STATUS_ROW_GAP_LINES = 0 // blank lines before status row
 const STATUS_ORDER: string[] = [
   // Put extension IDs in desired order (left -> right)
-  "pi-vim",
   "sandbox",
   "caveman",
-  "bedrock-thinking",
+  "mcp",
+  "pi-hindsight",
+  "link",
 ]
 const HIDDEN_STATUS_IDS = new Set<string>([
   // "executor",
-  "session-search",
 ])
 const HIDDEN_STATUS_TEXT_INCLUDES = [
   // "executor down",
   // "proj today",
 ].map((s) => s.toLowerCase())
-const SHOW_STATUS_IDS = false // set true once to discover IDs for ordering/hiding
+const SHOW_STATUS_IDS = process.env.SHOW_STATUS_IDS // set true once to discover IDs for ordering/hiding
 
 // ============ Path Abbreviation ============
 
