@@ -69,12 +69,16 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import {
   type BashOperations,
   createBashTool,
+  createLocalBashOperations,
   isToolCallEventType,
 } from "@mariozechner/pi-coding-agent";
 
 interface SandboxConfig extends SandboxRuntimeConfig {
   enabled?: boolean;
 }
+
+const ATUIN_AUTHOR = "pi";
+const ATUIN_TIMEOUT_MS = 10_000;
 
 const DEFAULT_CONFIG: SandboxConfig = {
   enabled: true,
@@ -336,6 +340,72 @@ function detectRepoRoots(cwd: string): string[] {
   return roots;
 }
 
+// ── Atuin command history ─────────────────────────────────────────────────────
+
+function createAtuinTrackedBashOps(pi: ExtensionAPI, operations: BashOperations): BashOperations {
+  let atuinInstalled: boolean | undefined;
+
+  async function isAtuinInstalled(cwd: string): Promise<boolean> {
+    if (atuinInstalled !== undefined) return atuinInstalled;
+
+    try {
+      const result = await pi.exec("atuin", ["--version"], { cwd, timeout: ATUIN_TIMEOUT_MS });
+      atuinInstalled = result.code === 0;
+    } catch {
+      atuinInstalled = false;
+    }
+
+    return atuinInstalled;
+  }
+
+  async function startHistory(cwd: string, command: string): Promise<string | undefined> {
+    if (!(await isAtuinInstalled(cwd))) return undefined;
+
+    try {
+      const result = await pi.exec(
+        "atuin",
+        ["history", "start", "--author", ATUIN_AUTHOR, "--", command],
+        { cwd, timeout: ATUIN_TIMEOUT_MS },
+      );
+
+      if (result.code !== 0) return undefined;
+
+      const id = result.stdout.trim();
+      return id.length > 0 ? id : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async function endHistory(cwd: string, historyId: string, exitCode: number): Promise<void> {
+    try {
+      await pi.exec("atuin", ["history", "end", historyId, "--exit", String(exitCode)], {
+        cwd,
+        timeout: ATUIN_TIMEOUT_MS,
+      });
+    } catch {
+      // Ignore Atuin failures so command execution is never blocked.
+    }
+  }
+
+  return {
+    async exec(command, cwd, options) {
+      const historyId = await startHistory(cwd, command);
+      let exitCode: number | null = null;
+
+      try {
+        const result = await operations.exec(command, cwd, options);
+        exitCode = result.exitCode;
+        return result;
+      } finally {
+        if (historyId) {
+          await endHistory(cwd, historyId, exitCode ?? (options.signal?.aborted ? 130 : 1));
+        }
+      }
+    },
+  };
+}
+
 // ── Sandboxed bash ops ────────────────────────────────────────────────────────
 
 function createSandboxedBashOps(): BashOperations {
@@ -418,7 +488,9 @@ export default function (pi: ExtensionAPI) {
   });
 
   const localCwd = process.cwd();
-  const localBash = createBashTool(localCwd);
+  const localBash = createBashTool(localCwd, {
+    operations: createAtuinTrackedBashOps(pi, createLocalBashOperations()),
+  });
 
   let sandboxEnabled = false;
   let sandboxInitialized = false;
@@ -593,7 +665,7 @@ export default function (pi: ExtensionAPI) {
           return localBash.execute(id, params, signal, onUpdate);
         }
         const sandboxedBash = createBashTool(localCwd, {
-          operations: createSandboxedBashOps(),
+          operations: createAtuinTrackedBashOps(pi, createSandboxedBashOps()),
         });
         return sandboxedBash.execute(id, params, signal, onUpdate);
       };
@@ -668,7 +740,7 @@ export default function (pi: ExtensionAPI) {
       }
     }
 
-    return { operations: createSandboxedBashOps() };
+    return { operations: createAtuinTrackedBashOps(pi, createSandboxedBashOps()) };
   });
 
   // ── tool_call — network pre-check for bash, path policy for read/write/edit

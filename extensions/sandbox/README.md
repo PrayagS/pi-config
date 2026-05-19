@@ -14,6 +14,7 @@ Uses [`@anthropic-ai/sandbox-runtime`](https://github.com/anthropics/anthropic-q
 - **Auto-allow session paths** — repo roots plus `$TMPDIR` / system temp dir auto-allowed for read/write at session start
 - **Domain glob patterns** — support `*.github.com` style wildcards
 - **Path glob patterns** — support `*.pem`, `.env.*` style patterns
+- **Optional Atuin history** — if `atuin` is installed, bash commands are recorded with author `pi`
 
 ## Commands
 
