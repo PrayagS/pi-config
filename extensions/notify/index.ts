@@ -6,23 +6,10 @@
  * - OSC 777: Ghostty, iTerm2, WezTerm, rxvt-unicode
  * - OSC 99: Kitty
  * - OSC 9 via DCS passthrough: tmux
- * - Windows toast: Windows Terminal (WSL)
+ * - BEL: universal bell (urgency hint / tab flash)
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
-
-function windowsToastScript(title: string, body: string): string {
-  const type = "Windows.UI.Notifications"
-  const mgr = `[${type}.ToastNotificationManager, ${type}, ContentType = WindowsRuntime]`
-  const template = `[${type}.ToastTemplateType]::ToastText01`
-  const toast = `[${type}.ToastNotification]::new($xml)`
-  return [
-    `${mgr} > $null`,
-    `$xml = [${type}.ToastNotificationManager]::GetTemplateContent(${template})`,
-    `$xml.GetElementsByTagName('text')[0].AppendChild($xml.CreateTextNode('${body}')) > $null`,
-    `[${type}.ToastNotificationManager]::CreateToastNotifier('${title}').Show(${toast})`,
-  ].join("; ")
-}
 
 function notifyOSC777(title: string, body: string): void {
   process.stdout.write(`\x1b]777;notify;${title};${body}\x07`)
@@ -63,25 +50,23 @@ function notifyTmux(title: string, body: string): void {
   }
 }
 
-function notifyWindows(title: string, body: string): void {
-  const { execFile } = require("child_process")
-  execFile("powershell.exe", [
-    "-NoProfile",
-    "-Command",
-    windowsToastScript(title, body),
-  ])
+function notifyBell(): void {
+  process.stdout.write("\x07")
 }
 
 function notify(title: string, body: string): void {
-  if (process.env.WT_SESSION) {
-    notifyWindows(title, body)
-  } else if (process.env.TMUX) {
+  if (process.env.ZED_TERM === "true") {
+    notifyBell()
+    return
+  }
+  if (process.env.TMUX) {
     notifyTmux(title, body)
   } else if (process.env.KITTY_WINDOW_ID) {
     notifyOSC99(title, body)
   } else {
     notifyOSC777(title, body)
   }
+  notifyBell()
 }
 
 export default function (pi: ExtensionAPI) {
