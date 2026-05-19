@@ -1088,7 +1088,7 @@ export default function (pi: ExtensionAPI) {
             total: ctxTotal,
           } = getContextInfo(ctx)
 
-          const pwd = abbreviatePath(process.cwd())
+          const pwd = abbreviatePath(ctx.cwd)
           const modelName = ctxModel?.id?.split("/").pop() || "no-model"
           let modelStr = theme.fg("muted", modelName)
           if (ctxModel?.reasoning) {
