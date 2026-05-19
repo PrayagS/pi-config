@@ -636,7 +636,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerProvider("bedrock-inference-profiles", {
     baseUrl: providerBaseUrl,
-    apiKey: "AWS_PROFILE",
+    apiKey: "$AWS_PROFILE",
     api: "bedrock-inference-profiles-api" as Api,
     models: configuredModels.map(
       ({ id, name, reasoning, input, cost, contextWindow, maxTokens }) => ({
