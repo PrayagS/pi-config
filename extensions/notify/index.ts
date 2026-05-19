@@ -55,10 +55,6 @@ function notifyBell(): void {
 }
 
 function notify(title: string, body: string): void {
-  if (process.env.ZED_TERM === "true") {
-    notifyBell()
-    return
-  }
   if (process.env.TMUX) {
     notifyTmux(title, body)
   } else if (process.env.KITTY_WINDOW_ID) {
