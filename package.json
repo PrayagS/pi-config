@@ -38,6 +38,7 @@
       "./extensions/working-indicator/index.ts",
       "./extensions/pi-dcp/index.ts",
       "./extensions/pi-images/index.ts",
+      "./extensions/pi-better-prompt-editor/index.ts",
       "./extensions/zzz-system-prompt-filter/index.ts"
     ],
     "skills": [
