@@ -14,7 +14,7 @@ import {
 } from "@mariozechner/pi-tui"
 
 const TOP_MARGIN_LINES = 1
-const MIN_BODY_LINES = 2
+const MIN_BODY_LINES = 3
 const MAX_BODY_LINES = Number(
   process.env.PI_BETTER_PROMPT_EDITOR_MAX_BODY_LINES ?? 8
 )
@@ -84,8 +84,8 @@ function selectBodyWindow(lines: string[], maxLines: number): string[] {
 function formatContext(ctx: ExtensionContext): string {
   const usage = ctx.getContextUsage()
   const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow
-  if (!contextWindow || !usage || usage.percent === null) return "ctx ?"
-  return `ctx ${Math.round(usage.percent)}%/${(contextWindow / 1000).toFixed(0)}k`
+  if (!contextWindow || !usage || usage.percent === null) return "?"
+  return `${Math.round(usage.percent)}%/${(contextWindow / 1000).toFixed(0)}k`
 }
 
 function formatThinking(level: string): string {
@@ -212,9 +212,12 @@ export default function (pi: ExtensionAPI) {
 
         const theme = ctx.ui.theme
         const modelId = ctx.model?.id ?? "no-model"
-        const topLeft = theme.fg("muted", ` ${formatCost(ctx)} `)
-        const topRightRaw = `${compactModelId(modelId, Math.max(8, Math.floor(innerWidth * 0.3)))} · ${formatThinking(pi.getThinkingLevel())} · ${formatContext(ctx).replace(/^ctx /, "")}`
+        const topRightRaw = `${compactModelId(modelId, Math.max(8, Math.floor(innerWidth * 0.3)))} · ${formatThinking(pi.getThinkingLevel())}`
         const topRight = theme.fg("muted", ` ${topRightRaw} `)
+        const bottomLeft = theme.fg(
+          "muted",
+          ` ${formatCost(ctx)} · ${formatContext(ctx)} `
+        )
         const bottomRight = theme.fg(
           "muted",
           ` ${compactPath(ctx.cwd)}${branch ? ` (${branch})` : ""} `
@@ -222,9 +225,9 @@ export default function (pi: ExtensionAPI) {
 
         return [
           ...Array.from({ length: TOP_MARGIN_LINES }, () => ""),
-          this.borderWithLabels(width, topLeft, topRight),
+          this.borderWithLabels(width, "", topRight),
           ...visibleBody.map((line) => this.wrapBody(line, innerWidth)),
-          this.borderWithLabels(width, "", bottomRight, "╰", "╯"),
+          this.borderWithLabels(width, bottomLeft, bottomRight, "╰", "╯"),
           ...this.wrapPopupBlock(popupLines, width),
         ]
       }
