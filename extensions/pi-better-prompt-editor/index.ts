@@ -13,7 +13,7 @@ import {
   visibleWidth,
 } from "@mariozechner/pi-tui"
 
-const TOP_MARGIN_LINES = 1
+const TOP_MARGIN_LINES = 0
 const MIN_BODY_LINES = 3
 const MAX_BODY_LINES = Number(
   process.env.PI_BETTER_PROMPT_EDITOR_MAX_BODY_LINES ?? 8
@@ -86,6 +86,17 @@ function formatContext(ctx: ExtensionContext): string {
   const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow
   if (!contextWindow || !usage || usage.percent === null) return "?"
   return `${Math.round(usage.percent)}%/${(contextWindow / 1000).toFixed(0)}k`
+}
+
+function contextStatusColor(
+  ctx: ExtensionContext
+): "success" | "accent" | "warning" | "error" | "muted" {
+  const percent = ctx.getContextUsage()?.percent
+  if (percent === null || percent === undefined) return "muted"
+  if (percent > 75) return "error"
+  if (percent >= 50) return "warning"
+  if (percent >= 40) return "accent"
+  return "muted"
 }
 
 function formatThinking(level: string): string {
@@ -189,10 +200,12 @@ export default function (pi: ExtensionAPI) {
         keybindings: KeybindingsManager
       ) {
         super(tui, theme, keybindings, { paddingX: 1 })
+        this.borderColor = ctx.ui.theme.getThinkingBorderColor(pi.getThinkingLevel())
         activeTui = tui
       }
 
       render(width: number): string[] {
+        this.borderColor = this.getCurrentBorderColor()
         if (width < 12) return super.render(width)
 
         const innerWidth = Math.max(1, width - 2)
@@ -215,7 +228,7 @@ export default function (pi: ExtensionAPI) {
         const topRightRaw = `${compactModelId(modelId, Math.max(8, Math.floor(innerWidth * 0.3)))} · ${formatThinking(pi.getThinkingLevel())}`
         const topRight = theme.fg("muted", ` ${topRightRaw} `)
         const bottomLeft = theme.fg(
-          "muted",
+          contextStatusColor(ctx),
           ` ${formatCost(ctx)} · ${formatContext(ctx)} `
         )
         const bottomRight = theme.fg(
@@ -230,6 +243,13 @@ export default function (pi: ExtensionAPI) {
           this.borderWithLabels(width, bottomLeft, bottomRight, "╰", "╯"),
           ...this.wrapPopupBlock(popupLines, width),
         ]
+      }
+
+      private getCurrentBorderColor(): (text: string) => string {
+        if (this.getText().trimStart().startsWith("!")) {
+          return ctx.ui.theme.getBashModeBorderColor()
+        }
+        return ctx.ui.theme.getThinkingBorderColor(pi.getThinkingLevel())
       }
 
       private borderWithLabels(
