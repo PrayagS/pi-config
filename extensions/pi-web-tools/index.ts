@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
 import { createWebExtractTool } from "./extract"
 import { webFetchTool } from "./fetch"
 import { createWebSearchTool } from "./search"
+import { registerWebUsageCommand } from "./usage"
 
 const WEB_GROUNDING_PROMPT =
   "## Grounding and web usage\n\n" +
@@ -37,4 +38,5 @@ export default function piWebTools(pi: ExtensionAPI) {
   pi.registerTool(createWebSearchTool(pi))
   pi.registerTool(webFetchTool)
   pi.registerTool(createWebExtractTool(pi))
+  registerWebUsageCommand(pi)
 }

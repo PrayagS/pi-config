@@ -1,11 +1,12 @@
 # pi-web-tools
 
-Pi extension providing `web_search`, `web_fetch`, and `web_extract` tools, plus a web-content untrusted-data system prompt guard when any of those tools are enabled.
+Pi extension providing `web_search`, `web_fetch`, `web_extract`, and `/web-tools usage`, plus a web-content untrusted-data system prompt guard when any of those tools are enabled.
 
 ## Structure
 
 ```
-├── index.ts                  # extension entry — registers tools
+├── index.ts                  # extension entry — registers tools/commands
+├── usage.ts                  # /web-tools usage provider balance command
 ├── providers/                # shared provider API clients
 │   ├── http.ts               #   fetchWithTimeout + fetchJson + postJson
 │   ├── kagi.ts               #   Kagi CLI argument builder
@@ -150,6 +151,16 @@ Provider credentials reuse existing environment variables:
 - `PI_WEB_FETCH_EXA_API_KEY`
 - `PI_WEB_FETCH_PARALLEL_API_KEY`
 - `PI_WEB_FETCH_TAVILY_API_KEY`
+
+## `/web-tools usage`
+
+Shows effective remaining usage for providers with billing/usage APIs:
+
+- Parallel: first uses `parallel-cli auth --json` and `parallel-cli balance get` when `parallel-cli` is installed/authenticated. Falls back to `credit_balance_cents - pending_debit_balance_cents` from `GET https://api.parallel.ai/account/service/v1/balance` with `PI_WEB_FETCH_PARALLEL_ACCOUNT_TOKEN` (Parallel account API access token; standard API key is not accepted by this endpoint).
+- Exa: usage cost for the API key ID in `PI_WEB_FETCH_EXA_API_KEY_ID` from `GET https://admin-api.exa.ai/team-management/api-keys/{id}/usage`. Requires `PI_WEB_FETCH_EXA_SERVICE_API_KEY` with Team Management access; falls back to `PI_WEB_FETCH_EXA_API_KEY` and reports a permission error on 401.
+- Firecrawl: `data.remainingCredits` from `GET https://api.firecrawl.dev/v2/team/credit-usage`. Requires `PI_WEB_FETCH_FIRECRAWL_API_KEY`.
+- You.com: `data.attributes.balance` from `GET https://api.you.com/v1/billing/account_balance`. Requires `PI_WEB_FETCH_YOU_API_KEY`.
+- Tavily: remaining account plan credits from `GET https://api.tavily.com/usage`, with plan total in the detail line. Requires `PI_WEB_FETCH_TAVILY_API_KEY`.
 
 ## Future work
 
