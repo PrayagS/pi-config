@@ -1,6 +1,6 @@
 # working-indicator
 
-Phase-aware working indicator that swaps the spinner based on what the agent is doing.
+Phase-aware working indicator that swaps the spinner based on what the agent is doing, with live elapsed time and output-token count.
 
 ## Phases
 
@@ -14,6 +14,14 @@ Phase-aware working indicator that swaps the spinner based on what the agent is 
 Priority: **thinking > tool > streaming > working**
 
 All frames are colored with the theme's accent color at runtime.
+
+## Working message
+
+While Pi works, loader text shows `Working… (1m 2s · ↓ 1.2k tokens)`.
+
+- Elapsed time starts when prompt is submitted.
+- Token count is a live whitespace-boundary estimate during streaming, then reconciles with Pi's reported `usage.output` after each assistant message.
+- Both reset for each prompt and Pi's default working message returns when agent finishes or `/working-indicator off` runs.
 
 ## Commands
 
