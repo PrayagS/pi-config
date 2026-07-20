@@ -21,14 +21,14 @@
   "license": "MIT",
   "pi": {
     "extensions": [
-      "./extensions/caveman/index.ts",
-      "./extensions/pi-spawn-claude-code/index.ts",
+      "./extensions/output-style/index.ts",
       "./extensions/commit/index.ts",
       "./extensions/reasoning/index.ts",
       "./extensions/custom-provider-bedrock-inference-profiles/index.ts",
       "./extensions/pi-web-tools/index.ts",
       "./extensions/interactive-shell/index.ts",
       "./extensions/prompt-history/index.ts",
+      "./extensions/prewalk/index.ts",
       "./extensions/notify/index.ts",
       "./extensions/qmd-sessions-indexer/index.ts",
       "./extensions/pi-co-authored-by/index.ts",

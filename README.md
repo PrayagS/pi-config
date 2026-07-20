@@ -21,7 +21,7 @@ pi -e git:github.com/PrayagS/pi-config
 
 ## Extensions
 
-- `extensions/caveman/` — response-style control with `/caveman`
+- `extensions/output-style/` — switch system-prompt output styles with `/output-style`
 - `extensions/commit/` — `/commit` command that prefetches VCS context and asks the agent to commit
 - `extensions/reasoning/` — persist exact model-to-reasoning-level mappings with `/reasoning`
 - `extensions/custom-provider-bedrock-inference-profiles/` — Bedrock inference profile support
