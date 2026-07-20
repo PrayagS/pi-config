@@ -28,7 +28,6 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/pi-web-tools/` — `web_search`, `web_fetch`, `web_extract`, and `/web-tools usage` provider usage summary
 - `extensions/interactive-shell/` — interactive shell integration
 - `extensions/notify/` — notifications
-- `extensions/qmd-sessions-indexer/` — refresh qmd session search indexes on Pi session lifecycle events
 - `extensions/pi-co-authored-by/` — append AI trailers to git/jj commits
 - `extensions/pi-dcp/` — dynamic context pruning (automatic rules + LLM tools)
 - `extensions/pi-footer/` — footer/status UI tweaks
@@ -39,13 +38,21 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/tools/` — tooling controls
 - `extensions/working-indicator/` — phase-aware working spinner (thinking/tool/streaming/working)
 - `extensions/pi-images/` — image attachments with kitty graphics preview ([credits](extensions/pi-images/README.md#credits))
-- `extensions/pi-spawn-claude-code/` — `claude` tool for spawning Claude Code CLI in background or interactive tmux mode
 - `extensions/zzz-system-prompt-filter/` — system prompt filtering
+
+### Experimental
+
+- `extensions/prewalk/` — plan on a strong model, then hand implementation to a fast model with `/prewalk`
+
+### Archive
+
+Retained in the repository but not registered by the package.
+
+- `extensions/qmd-sessions-indexer/` — refresh qmd session search indexes on Pi session lifecycle events
 
 ## Skills
 
 - `skills/vcs/` — unified git/jj version-control workflow with shared commit-message guidance
-- `skills/skill-creator/` — scaffold Pi skills
 - `skills/yaml-reader/` — query and validate YAML with `yq`
 
 ## AGENTS.md
@@ -57,13 +64,10 @@ pi -e git:github.com/PrayagS/pi-config
 These definitions are meant to be used with the [pi-interactive-subagents](https://github.com/HazAT/pi-interactive-subagents) extension.
 
 - `agents/` — subagent definitions adapted from <https://github.com/HazAT/pi-interactive-subagents/tree/main/agents>
-  - `agents/spec.md`
   - `agents/planner.md`
   - `agents/scout.md`
   - `agents/worker.md`
-  - `agents/reviewer.md`
   - `agents/researcher.md`
-  - `agents/claude-code.md`
 
 ## Notes
 
