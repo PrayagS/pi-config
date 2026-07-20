@@ -31,26 +31,44 @@ function isJjCommitOrDescribe(cmd: string): boolean {
   )
 }
 
+const COMMIT_SUBCOMMAND =
+  /\b(?:jj-hunk\s+commit|jj\s+(?:commit|ci|describe|desc|new)|git\s+commit)\b/g
+
 /**
- * Find the end position of a subcommand starting at `startPos`, stopping at
- * the next unquoted `&&`, `||`, or `;` shell operator.
+ * Find the end position of a subcommand starting at `startPos`, stopping at the
+ * next unquoted shell separator (`&`, `|`, `;`, newline). Quoted strings,
+ * backslash escapes, and command substitutions are skipped, so separators
+ * inside `-m "..."` or `$(... ; ...)` do not end the subcommand.
  */
 function findSubcommandEnd(cmd: string, startPos: number): number {
   let inSingle = false
   let inDouble = false
+  let depth = 0
   for (let i = startPos; i < cmd.length; i++) {
     const ch = cmd[i]
-    if (ch === "'" && !inDouble) inSingle = !inSingle
-    else if (ch === '"' && !inSingle) inDouble = !inDouble
-    else if (!inSingle && !inDouble) {
-      if (
-        (ch === "&" && cmd[i + 1] === "&") ||
-        (ch === "|" && cmd[i + 1] === "|") ||
-        ch === ";"
-      ) {
-        return i
-      }
+    if (ch === "\\" && !inSingle) {
+      i++ // escaped char, including a `\<newline>` line continuation
+      continue
     }
+    if (ch === "'" && !inDouble) {
+      inSingle = !inSingle
+      continue
+    }
+    if (ch === '"' && !inSingle) {
+      inDouble = !inDouble
+      continue
+    }
+    if (inSingle || inDouble) continue
+    if (ch === "(") {
+      depth++
+      continue
+    }
+    if (ch === ")") {
+      if (depth > 0) depth--
+      continue
+    }
+    if (depth > 0) continue
+    if (ch === "&" || ch === "|" || ch === ";" || ch === "\n") return i
   }
   return cmd.length
 }
@@ -58,23 +76,31 @@ function findSubcommandEnd(cmd: string, startPos: number): number {
 function appendTrailer(cmd: string, modelName: string): string {
   const trailer = `-m "Co-Authored-By: ${modelName} <noreply@pi.dev>"`
 
-  // Locate matching commit subcommand within potentially compound bash command.
-  // Appending to full string breaks with `cmd1 && jj describe -m "..." && cmd2`
-  // because trailer lands on cmd2 instead of jj describe.
-  const normalized = cmd.replace(/\\\n/g, " ")
-  const match =
-    /\b(jj-hunk\s+commit|jj\s+(commit|ci|describe|desc|new))\b/.exec(
-      normalized,
-    ) ?? /\bgit\s+commit\b/.exec(normalized)
+  // Locate every commit subcommand within a potentially compound bash command.
+  // Appending to the full string breaks with `jj describe -m "..." && cmd2` or a
+  // multi-line script, because the trailer lands on the wrong command.
+  const starts: number[] = []
+  for (const match of cmd.matchAll(COMMIT_SUBCOMMAND)) {
+    if (match.index !== undefined) starts.push(match.index)
+  }
 
-  if (!match || match.index === undefined) {
+  if (starts.length === 0) {
     return `${cmd.trimEnd()} ${trailer}`
   }
 
-  const endPos = findSubcommandEnd(cmd, match.index)
-  const before = cmd.slice(0, endPos).trimEnd()
-  const rest = cmd.slice(endPos).trimStart()
-  return rest ? `${before} ${trailer} ${rest}` : `${before} ${trailer}`
+  // Insert from last to first so earlier offsets stay valid.
+  let result = cmd
+  for (const start of starts.reverse()) {
+    const endPos = findSubcommandEnd(result, start)
+    // Skip subcommands with no message of their own (e.g. a bare `jj new`),
+    // otherwise the trailer would become the whole description.
+    if (!hasMessageFlag(result.slice(start, endPos))) continue
+    const before = result.slice(0, endPos).trimEnd()
+    const rest = result.slice(endPos)
+    const gap = rest.startsWith("\n") ? "" : " "
+    result = `${before} ${trailer}${rest ? gap + rest : ""}`
+  }
+  return result
 }
 
 export default function (pi: ExtensionAPI) {
