@@ -394,15 +394,21 @@ export default function questionnaire(pi: ExtensionAPI) {
           if (cachedLines) return cachedLines
           const lines: string[] = []
           const add = (s = "") => lines.push(truncateToWidth(s, width))
+          const addWrapped = (s: string, color = "text") => {
+            for (const line of wrapPlain(s, width - 1)) lines.push(theme.fg(color, ` ${line}`))
+          }
           const q = currentQuestion()
           const opts = currentOptions()
 
           add(theme.fg("accent", "─".repeat(width)))
-          if (params.title) add(` ${theme.fg("accent", theme.bold(params.title))}`)
+          if (params.title) {
+            add(` ${theme.fg("accent", theme.bold(params.title))}`)
+            add("")
+          }
           renderTabs(lines, width, theme, questions, currentTab, answers)
 
           if (inputMode && q) {
-            add(theme.fg("text", ` ${q.prompt}`))
+            addWrapped(q.prompt)
             add("")
             add(theme.fg("muted", " Type your answer. Use @ to reference files."))
             for (const line of editor.render(width - 2)) add(` ${line}`)
@@ -411,7 +417,7 @@ export default function questionnaire(pi: ExtensionAPI) {
           } else if (currentTab === questions.length) {
             renderReview(lines, width, theme, questions, answers)
           } else if (q) {
-            add(theme.fg("text", ` ${q.prompt}`))
+            addWrapped(q.prompt)
             add("")
             if (q.type === "preview") renderPreview(lines, width, theme, opts, optionIndex, answers.get(q.id))
             else renderOptions(lines, width, theme, opts, optionIndex, answers.get(q.id), q.type)
@@ -476,15 +482,38 @@ function renderTabs(lines: string[], width: number, theme: any, questions: Quest
 }
 
 function renderOptions(lines: string[], width: number, theme: any, opts: QuestionOption[], optionIndex: number, answer: Answer | undefined, type: QuestionType) {
+  const inner = Math.max(8, width - 4)
   for (let i = 0; i < opts.length; i++) {
     const opt = opts[i]
     const selected = i === optionIndex
     const checked = answer?.indices.includes(i + 1)
     const mark = type === "multi" ? (checked ? "■" : "□") : checked ? "●" : "○"
-    const prefix = selected ? theme.fg("accent", "> ") : "  "
-    const label = `${mark} ${i + 1}. ${opt.freeform && answer?.customText ? answer.customText : opt.label}`
-    lines.push(truncateToWidth(prefix + theme.fg(selected ? "accent" : "text", label), width))
-    if (opt.description) lines.push(truncateToWidth(`     ${theme.fg("muted", opt.description)}`, width))
+    const bullet = `${mark} ${i + 1}. `
+    const textIndent = visibleWidth(bullet)
+    const label = opt.freeform && answer?.customText ? answer.customText : opt.label
+
+    const body: { text: string; indent: number; muted: boolean }[] = []
+    wrapPlain(label, inner - textIndent).forEach((text, idx) => {
+      body.push({ text: idx === 0 ? bullet + text : text, indent: idx === 0 ? 0 : textIndent, muted: false })
+    })
+    if (opt.description) {
+      for (const text of wrapPlain(opt.description, inner - textIndent)) {
+        body.push({ text, indent: textIndent, muted: true })
+      }
+    }
+
+    const border = selected ? "accent" : checked ? "success" : "dim"
+    const labelColor = selected ? "accent" : checked ? "success" : "text"
+    lines.push(theme.fg(border, `┌${"─".repeat(inner + 2)}┐`))
+    for (const row of body) {
+      const content = padVisible(" ".repeat(row.indent) + row.text, inner)
+      lines.push(
+        theme.fg(border, "│ ") +
+          theme.fg(row.muted ? "muted" : labelColor, content) +
+          theme.fg(border, " │")
+      )
+    }
+    lines.push(theme.fg(border, `└${"─".repeat(inner + 2)}┘`))
   }
 }
 
@@ -531,11 +560,23 @@ function renderReview(lines: string[], width: number, theme: any, questions: Que
   lines.push("")
   for (const q of questions) {
     const answer = answers.get(q.id)
-    const text = answer ? answer.labels.join(", ") : theme.fg("dim", "Unanswered")
-    lines.push(truncateToWidth(`${theme.fg("muted", ` ${q.label}: `)}${theme.fg("text", text)}`, width))
+    const labelPrefix = ` ${q.label}: `
+    const indent = " ".repeat(labelPrefix.length)
+    const value = answer ? answer.labels.join(", ") : "Unanswered"
+    const color = answer ? "text" : "dim"
+    const valueLines = wrapPlain(value, Math.max(8, width - labelPrefix.length))
+    valueLines.forEach((line, idx) => {
+      const head = idx === 0 ? theme.fg("muted", labelPrefix) : indent
+      lines.push(head + theme.fg(color, line))
+    })
   }
   lines.push("")
   lines.push(theme.fg("success", " Press Enter to submit"))
+}
+
+function wrapPlain(text: string, width: number): string[] {
+  const wrapped = wrapTextWithAnsi(text, Math.max(4, width))
+  return wrapped.length ? wrapped : [""]
 }
 
 function padVisible(text: string, width: number): string {
