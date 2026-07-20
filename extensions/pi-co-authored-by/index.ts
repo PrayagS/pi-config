@@ -2,7 +2,7 @@
  * Co-Authored-By Extension
  *
  * Automatically appends a Co-Authored-By trailer to commit/describe messages
- * when the agent runs `git commit`, `jj commit`, `jj describe`, or `jj new`.
+ * when the agent runs `git commit`, `jj commit`, `jj-hunk commit`, `jj describe`, or `jj new`.
  *
  * Example message:
  *   fix: resolve null pointer
@@ -25,8 +25,9 @@ function isGitCommit(cmd: string): boolean {
 function isJjCommitOrDescribe(cmd: string): boolean {
   const normalized = cmd.replace(/\\\n/g, " ")
   return (
-    /\bjj\s+(commit|ci|describe|desc|new)\b/.test(normalized) &&
-    hasMessageFlag(normalized)
+    /\b(jj-hunk\s+commit|jj\s+(commit|ci|describe|desc|new))\b/.test(
+      normalized,
+    ) && hasMessageFlag(normalized)
   )
 }
 
@@ -57,13 +58,14 @@ function findSubcommandEnd(cmd: string, startPos: number): number {
 function appendTrailer(cmd: string, modelName: string): string {
   const trailer = `-m "Co-Authored-By: ${modelName} <noreply@pi.dev>"`
 
-  // Locate the matching jj/git subcommand within a potentially compound bash command.
-  // Appending to the end of the full string breaks with `cmd1 && jj describe -m "..." && cmd2`
-  // because the trailer lands on cmd2 instead of jj describe.
+  // Locate matching commit subcommand within potentially compound bash command.
+  // Appending to full string breaks with `cmd1 && jj describe -m "..." && cmd2`
+  // because trailer lands on cmd2 instead of jj describe.
   const normalized = cmd.replace(/\\\n/g, " ")
   const match =
-    /\bjj\s+(commit|ci|describe|desc|new)\b/.exec(normalized) ??
-    /\bgit\s+commit\b/.exec(normalized)
+    /\b(jj-hunk\s+commit|jj\s+(commit|ci|describe|desc|new))\b/.exec(
+      normalized,
+    ) ?? /\bgit\s+commit\b/.exec(normalized)
 
   if (!match || match.index === undefined) {
     return `${cmd.trimEnd()} ${trailer}`
