@@ -58,11 +58,13 @@
   ],
   "scripts": {
     "lint": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "test:co-authored-by": "bun test extensions/pi-co-authored-by/index.test.ts"
   },
   "dependencies": {
     "defuddle": "^0.18.1",
     "jsdom": "^26.0.0",
+    "unbash": "4.0.5",
     "unicode-animations": "^1.0.3"
   }
 }
