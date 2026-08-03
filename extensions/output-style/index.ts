@@ -1,16 +1,42 @@
 import * as fs from "node:fs"
+import { homedir } from "node:os"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
 
 const PROMPT_SUFFIX = ".prompt.md"
-const STATE_CUSTOM_TYPE = "output_style"
 const STATUS_ID = "output-style"
+const CONFIG_PATH = path.join(homedir(), ".pi", "agent", "output-style.json")
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 type StylePrompts = Map<string, string>
 type ActiveStyle = string | null
+
+function loadGlobalStyle(prompts: StylePrompts): ActiveStyle {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")) as {
+      style?: unknown
+    }
+    return typeof parsed.style === "string" && prompts.has(parsed.style)
+      ? parsed.style
+      : null
+  } catch {
+    return null
+  }
+}
+
+function saveGlobalStyle(style: ActiveStyle) {
+  fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true })
+  const tempPath = `${CONFIG_PATH}.${process.pid}.tmp`
+  try {
+    fs.writeFileSync(tempPath, `${JSON.stringify({ style }, null, 2)}\n`)
+    fs.renameSync(tempPath, CONFIG_PATH)
+  } catch (error) {
+    fs.rmSync(tempPath, { force: true })
+    throw error
+  }
+}
 
 function loadStylePrompts(): StylePrompts {
   const prompts = new Map<string, string>()
@@ -50,30 +76,7 @@ export default function outputStyleExtension(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     prompts = loadStylePrompts()
-
-    const entries = ctx.sessionManager.getBranch()
-    let restoredStyle: ActiveStyle = null
-    for (let i = entries.length - 1; i >= 0; i--) {
-      const entry = entries[i] as {
-        type?: string
-        customType?: string
-        data?: { style?: unknown }
-      }
-      if (
-        entry.type === "custom" &&
-        entry.customType === STATE_CUSTOM_TYPE &&
-        (entry.data?.style === null || typeof entry.data?.style === "string")
-      ) {
-        const savedStyle = entry.data.style
-        restoredStyle =
-          typeof savedStyle === "string" && prompts.has(savedStyle)
-            ? savedStyle
-            : null
-        break
-      }
-    }
-
-    applyStyle(restoredStyle, ctx)
+    applyStyle(loadGlobalStyle(prompts), ctx)
   })
 
   pi.on("session_shutdown", async (_event, ctx) => {
@@ -108,8 +111,16 @@ export default function outputStyleExtension(pi: ExtensionAPI) {
       }
 
       applyStyle(nextStyle, ctx)
-      pi.appendEntry(STATE_CUSTOM_TYPE, { style: nextStyle })
-      ctx.ui.notify(`output style: ${nextStyle ?? "off"}`, "info")
+      try {
+        saveGlobalStyle(nextStyle)
+        ctx.ui.notify(`global output style: ${nextStyle ?? "off"}`, "info")
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        ctx.ui.notify(
+          `output style active for this session, but global save failed: ${message}`,
+          "warning"
+        )
+      }
     },
   })
 
