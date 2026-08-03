@@ -180,6 +180,7 @@ export default function questionnaire(pi: ExtensionAPI) {
         let optionIndex = 0
         let inputMode = false
         let inputQuestionId: string | null = null
+        let cachedWidth: number | undefined
         let cachedLines: string[] | undefined
         const answers = new Map<string, Answer>()
 
@@ -197,6 +198,7 @@ export default function questionnaire(pi: ExtensionAPI) {
         editor.setAutocompleteProvider(createAutocompleteProvider(ctx.cwd))
 
         function refresh() {
+          cachedWidth = undefined
           cachedLines = undefined
           tui.requestRender()
         }
@@ -391,7 +393,7 @@ export default function questionnaire(pi: ExtensionAPI) {
         }
 
         function render(width: number): string[] {
-          if (cachedLines) return cachedLines
+          if (cachedLines && cachedWidth === width) return cachedLines
           const lines: string[] = []
           const add = (s = "") => lines.push(truncateToWidth(s, width))
           const addWrapped = (s: string, color = "text") => {
@@ -426,11 +428,19 @@ export default function questionnaire(pi: ExtensionAPI) {
           add("")
           add(theme.fg("dim", " Tab/←→ tabs • ↑↓ move • 1-9 choose • Enter/Space select • Esc cancel"))
           add(theme.fg("accent", "─".repeat(width)))
+          cachedWidth = width
           cachedLines = lines
           return lines
         }
 
-        return { render, invalidate: () => (cachedLines = undefined), handleInput }
+        return {
+          render,
+          invalidate: () => {
+            cachedWidth = undefined
+            cachedLines = undefined
+          },
+          handleInput,
+        }
       })
 
       if (result.cancelled) {
@@ -504,16 +514,19 @@ function renderOptions(lines: string[], width: number, theme: any, opts: Questio
 
     const border = selected ? "accent" : checked ? "success" : "dim"
     const labelColor = selected ? "accent" : checked ? "success" : "text"
-    lines.push(theme.fg(border, `┌${"─".repeat(inner + 2)}┐`))
+    lines.push(truncateToWidth(theme.fg(border, `┌${"─".repeat(inner + 2)}┐`), width))
     for (const row of body) {
       const content = padVisible(" ".repeat(row.indent) + row.text, inner)
       lines.push(
-        theme.fg(border, "│ ") +
-          theme.fg(row.muted ? "muted" : labelColor, content) +
-          theme.fg(border, " │")
+        truncateToWidth(
+          theme.fg(border, "│ ") +
+            theme.fg(row.muted ? "muted" : labelColor, content) +
+            theme.fg(border, " │"),
+          width
+        )
       )
     }
-    lines.push(theme.fg(border, `└${"─".repeat(inner + 2)}┘`))
+    lines.push(truncateToWidth(theme.fg(border, `└${"─".repeat(inner + 2)}┘`), width))
   }
 }
 
@@ -552,7 +565,7 @@ function renderPreviewBox(opt: QuestionOption | undefined, theme: any, width: nu
       return theme.fg("dim", "│ ") + theme.fg(color, padVisible(line, inner)) + theme.fg("dim", " │")
     }),
     theme.fg("dim", bottom),
-  ]
+  ].map((line) => truncateToWidth(line, width))
 }
 
 function renderReview(lines: string[], width: number, theme: any, questions: Question[], answers: Map<string, Answer>) {
