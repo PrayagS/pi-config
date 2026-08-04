@@ -46,7 +46,7 @@ function providers(pi: ExtensionAPI): Record<ProviderName, WebSearchProvider> {
 
 function providerOrder(includeContent?: boolean): ProviderName[] {
   const supported = includeContent ? contentProviderNames : providerNames
-  const forced = process.env.PI_WEB_SEARCH_STAGE
+  const forced = process.env.WEB_TOOLS_SEARCH_STAGE
   if (!forced) return [...supported]
   if (!supported.includes(forced as (typeof supported)[number])) {
     throw new Error(`Stage "${forced}" not supported for web_search. Supported: ${supported.join(", ")}`)

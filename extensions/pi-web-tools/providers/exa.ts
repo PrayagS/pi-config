@@ -13,7 +13,7 @@ export async function getExaContents(
 ): Promise<any | null> {
   return postJson({
     url: "https://api.exa.ai/contents",
-    apiKeyEnv: "PI_WEB_FETCH_EXA_API_KEY",
+    apiKeyEnv: "WEB_TOOLS_EXA_API_KEY",
     headers: (apiKey) => ({
       "x-api-key": apiKey,
       "Content-Type": "application/json",

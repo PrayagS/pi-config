@@ -78,7 +78,7 @@ async function getJson<T>(
 }
 
 async function parallelUsageFromToken(): Promise<UsageLine | null> {
-  const token = env("PI_WEB_FETCH_PARALLEL_ACCOUNT_TOKEN")
+  const token = env("WEB_TOOLS_PARALLEL_ACCOUNT_TOKEN")
   if (!token) return null
 
   const json = await getJson<{
@@ -94,7 +94,7 @@ async function parallelUsageFromToken(): Promise<UsageLine | null> {
       provider: "Parallel",
       status: "ok",
       remaining: "postpaid invoice",
-      detail: "PI_WEB_FETCH_PARALLEL_ACCOUNT_TOKEN; will_invoice=true",
+      detail: "WEB_TOOLS_PARALLEL_ACCOUNT_TOKEN; will_invoice=true",
     }
   }
 
@@ -103,7 +103,7 @@ async function parallelUsageFromToken(): Promise<UsageLine | null> {
     provider: "Parallel",
     status: "ok",
     remaining: moneyFromCents(effective),
-    detail: `PI_WEB_FETCH_PARALLEL_ACCOUNT_TOKEN; ${moneyFromCents(json.credit_balance_cents)} balance - ${moneyFromCents(json.pending_debit_balance_cents)} pending`,
+    detail: `WEB_TOOLS_PARALLEL_ACCOUNT_TOKEN; ${moneyFromCents(json.credit_balance_cents)} balance - ${moneyFromCents(json.pending_debit_balance_cents)} pending`,
   }
 }
 
@@ -155,27 +155,27 @@ async function parallelUsage(pi: ExtensionAPI): Promise<UsageLine> {
     provider: "Parallel",
     status: "error",
     detail: cliError
-      ? `parallel-cli failed: ${cliError}; run \`parallel-cli auth\` or set PI_WEB_FETCH_PARALLEL_ACCOUNT_TOKEN`
-      : "run `parallel-cli auth` or set PI_WEB_FETCH_PARALLEL_ACCOUNT_TOKEN (account API access token)",
+      ? `parallel-cli failed: ${cliError}; run \`parallel-cli auth\` or set WEB_TOOLS_PARALLEL_ACCOUNT_TOKEN`
+      : "run `parallel-cli auth` or set WEB_TOOLS_PARALLEL_ACCOUNT_TOKEN (account API access token)",
   }
 }
 
 async function exaUsage(): Promise<UsageLine> {
-  const apiKey = firstEnv("PI_WEB_FETCH_EXA_SERVICE_API_KEY", "PI_WEB_FETCH_EXA_API_KEY")
+  const apiKey = firstEnv("WEB_TOOLS_EXA_SERVICE_API_KEY", "WEB_TOOLS_EXA_API_KEY")
   if (!apiKey) {
     return {
       provider: "Exa",
       status: "missing",
-      detail: "set PI_WEB_FETCH_EXA_SERVICE_API_KEY (Team Management service key)",
+      detail: "set WEB_TOOLS_EXA_SERVICE_API_KEY (Team Management service key)",
     }
   }
 
-  const apiKeyId = env("PI_WEB_FETCH_EXA_API_KEY_ID")
+  const apiKeyId = env("WEB_TOOLS_EXA_API_KEY_ID")
   if (!apiKeyId) {
     return {
       provider: "Exa",
       status: "missing",
-      detail: "set PI_WEB_FETCH_EXA_API_KEY_ID to the Exa API key ID to inspect",
+      detail: "set WEB_TOOLS_EXA_API_KEY_ID to the Exa API key ID to inspect",
     }
   }
 
@@ -191,14 +191,14 @@ async function exaUsage(): Promise<UsageLine> {
       return {
         provider: "Exa",
         status: "error",
-        detail: `${apiKey.name} is unauthorized for Team Management; set PI_WEB_FETCH_EXA_SERVICE_API_KEY to a service key with team access`,
+        detail: `${apiKey.name} is unauthorized for Team Management; set WEB_TOOLS_EXA_SERVICE_API_KEY to a service key with team access`,
       }
     }
     if (message.startsWith("404 ")) {
       return {
         provider: "Exa",
         status: "error",
-        detail: `PI_WEB_FETCH_EXA_API_KEY_ID not found or inaccessible: ${apiKeyId}`,
+        detail: `WEB_TOOLS_EXA_API_KEY_ID not found or inaccessible: ${apiKeyId}`,
       }
     }
     throw error
@@ -216,8 +216,8 @@ async function exaUsage(): Promise<UsageLine> {
 }
 
 async function firecrawlUsage(): Promise<UsageLine> {
-  const apiKey = env("PI_WEB_FETCH_FIRECRAWL_API_KEY")
-  if (!apiKey) return { provider: "Firecrawl", status: "missing", detail: "set PI_WEB_FETCH_FIRECRAWL_API_KEY" }
+  const apiKey = env("WEB_TOOLS_FIRECRAWL_API_KEY")
+  if (!apiKey) return { provider: "Firecrawl", status: "missing", detail: "set WEB_TOOLS_FIRECRAWL_API_KEY" }
 
   const json = await getJson<{
     data?: { remainingCredits?: number; planCredits?: number; billingPeriodEnd?: string | null }
@@ -234,8 +234,8 @@ async function firecrawlUsage(): Promise<UsageLine> {
 }
 
 async function youUsage(): Promise<UsageLine> {
-  const apiKey = env("PI_WEB_FETCH_YOU_API_KEY")
-  if (!apiKey) return { provider: "You.com", status: "missing", detail: "set PI_WEB_FETCH_YOU_API_KEY" }
+  const apiKey = env("WEB_TOOLS_YOU_API_KEY")
+  if (!apiKey) return { provider: "You.com", status: "missing", detail: "set WEB_TOOLS_YOU_API_KEY" }
 
   const json = await getJson<{ data?: { attributes?: { balance?: number } } }>(
     "https://api.you.com/v1/billing/account_balance",
@@ -262,8 +262,8 @@ function remainingCredits(used: number | undefined, limit: number | null | undef
 }
 
 async function tavilyUsage(): Promise<UsageLine> {
-  const apiKey = env("PI_WEB_FETCH_TAVILY_API_KEY")
-  if (!apiKey) return { provider: "Tavily", status: "missing", detail: "set PI_WEB_FETCH_TAVILY_API_KEY" }
+  const apiKey = env("WEB_TOOLS_TAVILY_API_KEY")
+  if (!apiKey) return { provider: "Tavily", status: "missing", detail: "set WEB_TOOLS_TAVILY_API_KEY" }
 
   const json = await getJson<{
     key?: { usage?: number; limit?: number | null }

@@ -132,7 +132,7 @@ export const searchFirecrawl: WebSearchProvider = async ({
   if (includeContent) body.scrapeOptions = { formats: [{ type: "markdown" }] }
   const json = await postJson<any>({
     url: "https://api.firecrawl.dev/v2/search",
-    apiKeyEnv: "PI_WEB_FETCH_FIRECRAWL_API_KEY",
+    apiKeyEnv: "WEB_TOOLS_FIRECRAWL_API_KEY",
     headers: (apiKey) => ({ Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }),
     body,
     signal,
@@ -156,7 +156,7 @@ export const searchTavily: WebSearchProvider = async ({
 }) => {
   const json = await postJson<any>({
     url: "https://api.tavily.com/search",
-    apiKeyEnv: "PI_WEB_FETCH_TAVILY_API_KEY",
+    apiKeyEnv: "WEB_TOOLS_TAVILY_API_KEY",
     headers: (apiKey) => ({ Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }),
     body: {
       query,
@@ -199,7 +199,7 @@ export const searchParallel: WebSearchProvider = async ({
   if (parallelSessionId) body.session_id = parallelSessionId
   const json = await postJson<any>({
     url: "https://api.parallel.ai/v1/search",
-    apiKeyEnv: "PI_WEB_FETCH_PARALLEL_API_KEY",
+    apiKeyEnv: "WEB_TOOLS_PARALLEL_API_KEY",
     headers: (apiKey) => ({ "x-api-key": apiKey, "Content-Type": "application/json" }),
     body,
     signal,
@@ -221,7 +221,7 @@ export const searchExa: WebSearchProvider = async ({
 }) => {
   const json = await postJson<any>({
     url: "https://api.exa.ai/search",
-    apiKeyEnv: "PI_WEB_FETCH_EXA_API_KEY",
+    apiKeyEnv: "WEB_TOOLS_EXA_API_KEY",
     headers: (apiKey) => ({ "x-api-key": apiKey, "Content-Type": "application/json" }),
     body: {
       query,
@@ -250,7 +250,7 @@ export const searchYou: WebSearchProvider = async ({
 }) => {
   const json = await postJson<any>({
     url: "https://ydc-index.io/v1/search",
-    apiKeyEnv: "PI_WEB_FETCH_YOU_API_KEY",
+    apiKeyEnv: "WEB_TOOLS_YOU_API_KEY",
     headers: (apiKey) => ({ "X-API-Key": apiKey, "Content-Type": "application/json" }),
     body: {
       query,

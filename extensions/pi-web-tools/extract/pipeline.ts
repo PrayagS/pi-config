@@ -26,7 +26,7 @@ async function runEnvStage(
   supportedStages: Record<string, string[]>,
   signal?: AbortSignal
 ): Promise<WebExtractOutput | null> {
-  const envStage = process.env.PI_WEB_EXTRACT_STAGE
+  const envStage = process.env.WEB_TOOLS_EXTRACT_STAGE
   if (!envStage) return null
 
   if (!supportedStages[params.mode].includes(envStage)) {

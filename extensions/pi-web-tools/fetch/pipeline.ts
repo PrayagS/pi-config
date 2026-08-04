@@ -11,7 +11,7 @@ async function runEnvStage(
   rawHtml: boolean,
   signal?: AbortSignal
 ): Promise<FetchResult | null> {
-  const envStage = process.env.PI_WEB_FETCH_STAGE
+  const envStage = process.env.WEB_TOOLS_FETCH_STAGE
   if (!envStage) return null
 
   if (envStage === "defuddle") return defuddle(url, !rawHtml, signal)

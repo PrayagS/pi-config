@@ -12,7 +12,7 @@ export async function fetchYouContents(
 ): Promise<any | null> {
   return postJson({
     url: "https://ydc-index.io/v1/contents",
-    apiKeyEnv: "PI_WEB_FETCH_YOU_API_KEY",
+    apiKeyEnv: "WEB_TOOLS_YOU_API_KEY",
     headers: (apiKey) => ({
       "X-API-KEY": apiKey,
       "Content-Type": "application/json",

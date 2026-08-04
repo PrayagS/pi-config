@@ -11,7 +11,7 @@ export async function scrapeFirecrawl(
 ): Promise<any | null> {
   return postJson({
     url: "https://api.firecrawl.dev/v2/scrape",
-    apiKeyEnv: "PI_WEB_FETCH_FIRECRAWL_API_KEY",
+    apiKeyEnv: "WEB_TOOLS_FIRECRAWL_API_KEY",
     headers: (apiKey) => ({
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",

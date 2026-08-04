@@ -14,7 +14,7 @@ export async function extractTavily(
 ): Promise<any | null> {
   return postJson({
     url: "https://api.tavily.com/extract",
-    apiKeyEnv: "PI_WEB_FETCH_TAVILY_API_KEY",
+    apiKeyEnv: "WEB_TOOLS_TAVILY_API_KEY",
     headers: (apiKey) => ({
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",

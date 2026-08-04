@@ -18,7 +18,7 @@ export async function extractParallel(
 
   const json = await postJson<any>({
     url: "https://api.parallel.ai/v1/extract",
-    apiKeyEnv: "PI_WEB_FETCH_PARALLEL_API_KEY",
+    apiKeyEnv: "WEB_TOOLS_PARALLEL_API_KEY",
     headers: (apiKey) => ({
       "x-api-key": apiKey,
       "Content-Type": "application/json",

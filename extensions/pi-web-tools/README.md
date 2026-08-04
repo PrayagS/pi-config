@@ -57,7 +57,7 @@ Pi extension providing `web_search`, `web_fetch`, `web_extract`, and `/web-tools
 
 Search the web using a multi-provider pipeline. Runs one or more queries in parallel and returns numbered result blocks with title, URL, provider source, published date, and snippet.
 
-Provider order: Parallel → Exa → Kagi CLI → You.com → Firecrawl → Tavily. Each API provider self-skips when its API key env var is missing. Set `PI_WEB_SEARCH_STAGE` to force one provider: `parallel`, `exa`, `kagi`, `you`, `firecrawl`, or `tavily`.
+Provider order: Parallel → Exa → Kagi CLI → You.com → Firecrawl → Tavily. Each API provider self-skips when its API key env var is missing. Set `WEB_TOOLS_SEARCH_STAGE` to force one provider: `parallel`, `exa`, `kagi`, `you`, `firecrawl`, or `tavily`.
 
 ### Parameters
 
@@ -70,11 +70,11 @@ Provider order: Parallel → Exa → Kagi CLI → You.com → Firecrawl → Tavi
 
 Kagi requires the `kagi` CLI to be installed and authenticated. API providers reuse existing web fetch credentials:
 
-- `PI_WEB_FETCH_FIRECRAWL_API_KEY`
-- `PI_WEB_FETCH_TAVILY_API_KEY`
-- `PI_WEB_FETCH_PARALLEL_API_KEY`
-- `PI_WEB_FETCH_EXA_API_KEY`
-- `PI_WEB_FETCH_YOU_API_KEY`
+- `WEB_TOOLS_FIRECRAWL_API_KEY`
+- `WEB_TOOLS_TAVILY_API_KEY`
+- `WEB_TOOLS_PARALLEL_API_KEY`
+- `WEB_TOOLS_EXA_API_KEY`
+- `WEB_TOOLS_YOU_API_KEY`
 
 ## `web_fetch`
 
@@ -87,18 +87,18 @@ Fetch a URL and return clean, readable Markdown content, or raw HTML when reques
 1. **Domain handlers** — GitHub, Hacker News, Reddit get specialized extraction
 2. **Content negotiation** — prefers markdown if server supports it
 3. **API extractors** (priority order) — each self-checks its env var
-   - Jina AI Reader (`PI_WEB_FETCH_JINA_API_KEY`)
-   - Firecrawl (`PI_WEB_FETCH_FIRECRAWL_API_KEY`)
-   - Parallel (`PI_WEB_FETCH_PARALLEL_API_KEY`)
-   - Exa.ai (`PI_WEB_FETCH_EXA_API_KEY`)
-   - Tavily (`PI_WEB_FETCH_TAVILY_API_KEY`)
-   - You.com (`PI_WEB_FETCH_YOU_API_KEY`)
+   - Jina AI Reader (`WEB_TOOLS_JINA_API_KEY`)
+   - Firecrawl (`WEB_TOOLS_FIRECRAWL_API_KEY`)
+   - Parallel (`WEB_TOOLS_PARALLEL_API_KEY`)
+   - Exa.ai (`WEB_TOOLS_EXA_API_KEY`)
+   - Tavily (`WEB_TOOLS_TAVILY_API_KEY`)
+   - You.com (`WEB_TOOLS_YOU_API_KEY`)
    - markdown.new proxy
 4. **Defuddle** — default HTML extraction
 
 Large outputs are truncated to Pi limits and saved to a temp file for paging.
 
-Set `PI_WEB_FETCH_STAGE` to force one fetch stage:
+Set `WEB_TOOLS_FETCH_STAGE` to force one fetch stage:
 
 - `content-negotiation`
 - `jina-ai`
@@ -130,7 +130,7 @@ Extract summaries or targeted information from up to 5 URLs.
 - `summary`: Firecrawl → Exa → Kagi CLI
 - `targeted`: Exa → Parallel → Tavily
 
-Set `PI_WEB_EXTRACT_STAGE` to force one provider:
+Set `WEB_TOOLS_EXTRACT_STAGE` to force one provider:
 
 - `summary`: `firecrawl`, `exa`, `kagi`
 - `targeted`: `exa`, `parallel`, `tavily`
@@ -147,20 +147,20 @@ Firecrawl is single-URL only, so summary mode fans out one scrape request per UR
 
 Provider credentials reuse existing environment variables:
 
-- `PI_WEB_FETCH_FIRECRAWL_API_KEY`
-- `PI_WEB_FETCH_EXA_API_KEY`
-- `PI_WEB_FETCH_PARALLEL_API_KEY`
-- `PI_WEB_FETCH_TAVILY_API_KEY`
+- `WEB_TOOLS_FIRECRAWL_API_KEY`
+- `WEB_TOOLS_EXA_API_KEY`
+- `WEB_TOOLS_PARALLEL_API_KEY`
+- `WEB_TOOLS_TAVILY_API_KEY`
 
 ## `/web-tools usage`
 
 Shows effective remaining usage for providers with billing/usage APIs:
 
-- Parallel: first uses `parallel-cli auth --json` and `parallel-cli balance get` when `parallel-cli` is installed/authenticated. Falls back to `credit_balance_cents - pending_debit_balance_cents` from `GET https://api.parallel.ai/account/service/v1/balance` with `PI_WEB_FETCH_PARALLEL_ACCOUNT_TOKEN` (Parallel account API access token; standard API key is not accepted by this endpoint).
-- Exa: usage cost for the API key ID in `PI_WEB_FETCH_EXA_API_KEY_ID` from `GET https://admin-api.exa.ai/team-management/api-keys/{id}/usage`. Requires `PI_WEB_FETCH_EXA_SERVICE_API_KEY` with Team Management access; falls back to `PI_WEB_FETCH_EXA_API_KEY` and reports a permission error on 401.
-- Firecrawl: `data.remainingCredits` from `GET https://api.firecrawl.dev/v2/team/credit-usage`. Requires `PI_WEB_FETCH_FIRECRAWL_API_KEY`.
-- You.com: `data.attributes.balance` from `GET https://api.you.com/v1/billing/account_balance`. Requires `PI_WEB_FETCH_YOU_API_KEY`.
-- Tavily: remaining account plan credits from `GET https://api.tavily.com/usage`, with plan total in the detail line. Requires `PI_WEB_FETCH_TAVILY_API_KEY`.
+- Parallel: first uses `parallel-cli auth --json` and `parallel-cli balance get` when `parallel-cli` is installed/authenticated. Falls back to `credit_balance_cents - pending_debit_balance_cents` from `GET https://api.parallel.ai/account/service/v1/balance` with `WEB_TOOLS_PARALLEL_ACCOUNT_TOKEN` (Parallel account API access token; standard API key is not accepted by this endpoint).
+- Exa: usage cost for the API key ID in `WEB_TOOLS_EXA_API_KEY_ID` from `GET https://admin-api.exa.ai/team-management/api-keys/{id}/usage`. Requires `WEB_TOOLS_EXA_SERVICE_API_KEY` with Team Management access; falls back to `WEB_TOOLS_EXA_API_KEY` and reports a permission error on 401.
+- Firecrawl: `data.remainingCredits` from `GET https://api.firecrawl.dev/v2/team/credit-usage`. Requires `WEB_TOOLS_FIRECRAWL_API_KEY`.
+- You.com: `data.attributes.balance` from `GET https://api.you.com/v1/billing/account_balance`. Requires `WEB_TOOLS_YOU_API_KEY`.
+- Tavily: remaining account plan credits from `GET https://api.tavily.com/usage`, with plan total in the detail line. Requires `WEB_TOOLS_TAVILY_API_KEY`.
 
 ## Future work
 

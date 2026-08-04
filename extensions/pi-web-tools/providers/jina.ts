@@ -11,7 +11,7 @@ export async function fetchJinaReader(
 ): Promise<any | null> {
   return postJson({
     url: "https://r.jina.ai/",
-    apiKeyEnv: "PI_WEB_FETCH_JINA_API_KEY",
+    apiKeyEnv: "WEB_TOOLS_JINA_API_KEY",
     headers: (apiKey) => {
       const headers: Record<string, string> = {
         Authorization: `Bearer ${apiKey}`,
