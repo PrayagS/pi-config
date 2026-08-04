@@ -176,7 +176,7 @@ Ask only about genuine ambiguity. Skip what's already clear from context. The go
 
 ### How to ask:
 
-- Group related questions. Use the available user-question tool to present a clean Q&A.
+- Group related questions. Use the `questionnaire` tool instead of asking inline.
 - Prefer multiple choice when possible.
 - Don't re-ask what the user already said. Don't ask what you can read from code.
 - If the user's answer is vague, one follow-up is fine. If still vague, pick a sensible default and note it as an assumption.
