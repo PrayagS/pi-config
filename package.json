@@ -59,7 +59,8 @@
   "scripts": {
     "lint": "biome check .",
     "format": "biome format --write .",
-    "test:co-authored-by": "bun test extensions/pi-co-authored-by/index.test.ts"
+    "test:co-authored-by": "bun test extensions/pi-co-authored-by/index.test.ts",
+    "test:output-style": "bun test extensions/output-style/index.test.ts"
   },
   "dependencies": {
     "defuddle": "^0.18.1",
