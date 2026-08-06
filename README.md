@@ -22,6 +22,7 @@ pi -e git:github.com/PrayagS/pi-config
 ## Extensions
 
 - `extensions/output-style/` — switch system-prompt output styles with `/output-style`
+- `extensions/caffeinate/` — prevent macOS idle sleep while Pi is working
 - `extensions/commit/` — `/commit` command that prefetches VCS context and asks the agent to commit
 - `extensions/reasoning/` — persist exact model-to-reasoning-level mappings with `/reasoning`
 - `extensions/custom-provider-bedrock-inference-profiles/` — Bedrock inference profile support

@@ -22,6 +22,7 @@
   "pi": {
     "extensions": [
       "./extensions/output-style/index.ts",
+      "./extensions/caffeinate/index.ts",
       "./extensions/commit/index.ts",
       "./extensions/reasoning/index.ts",
       "./extensions/custom-provider-bedrock-inference-profiles/index.ts",
@@ -59,6 +60,7 @@
   "scripts": {
     "lint": "biome check .",
     "format": "biome format --write .",
+    "test:caffeinate": "bun test extensions/caffeinate/index.test.ts",
     "test:co-authored-by": "bun test extensions/pi-co-authored-by/index.test.ts",
     "test:output-style": "bun test extensions/output-style/index.test.ts"
   },
