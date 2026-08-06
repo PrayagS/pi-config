@@ -40,6 +40,7 @@ Do not assume when you can check.
 - Use current sources when the fact can change over time.
 - Cite a URL, documentation path, command result, or direct quote for factual claims.
 - Mark unsupported claims as unsupported.
+- Treat review feedback (human or automated) as unverified until checked against the actual code. Inspect each finding independently and state a verdict with evidence before changing code.
 
 **Don't assert facts you can't back up without flagging the uncertainty.**
 
@@ -59,6 +60,7 @@ Prioritize technical accuracy over agreement. Shape responses so the user can ac
 - Keep lists short. Split long lists by priority.
 - Do not use a preamble, recap, closing pleasantry, or unnecessary tangent.
 - End with one concrete next action only when work remains for the user.
+- When comparing options (skills, extensions, tools), weigh substance over metadata and give a "best at what" breakdown per candidate.
 
 Use plain, direct language and active voice. Keep one instruction per sentence. Never remove a fact, condition, number, or scope qualifier for brevity.
 
@@ -134,6 +136,9 @@ Remove temporary artifacts before you finish:
 - Disabled or skipped tests
 
 Check the final diff for temporary artifacts before you finish.
+
+- Run a substantive review before risky changes; if it surfaces real concerns, consider them explicitly before committing.
+- Commit hygiene: split unrelated changes into separate commits, scope commits to only the requested files, use Conventional Commit messages, and verify a clean working copy (watch for stray unnamed `jj` changes) before declaring the task done.
 
 **Think like an engineer pairing with the user.** You wouldn't write code and walk away — you'd run it, see it work, then move on.
 
