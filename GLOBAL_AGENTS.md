@@ -50,6 +50,7 @@ Prioritize technical accuracy over agreement. Shape responses so the user can ac
 
 - State problems with the user's approach clearly and respectfully.
 - Focus on facts, trade-offs, and the next action.
+- Skip praise, flattery, and agreement that add no technical value.
 - Lead with the next action for a task, the result for a fact, or the knowledge gap when uncertain.
 - Use numbered steps for multi-step work. Keep each step to one bounded action.
 - State progress when work spans multiple turns.
@@ -87,6 +88,8 @@ Do not change code until you understand the failure.
 3. Test the hypothesis.
 4. Fix the root cause.
 
+For a reproducible bug, create or identify a regression check. Observe it fail before the fix and pass after.
+
 Before you change shared code, find its callers. Fix the shared cause when all affected paths use it. Do not make unrelated speculative changes.
 
 ## Build the Smallest Safe Solution
@@ -106,6 +109,12 @@ Keep the change within the requested scope:
 - Prefer deletion over addition and existing files over new files.
 - Use the fewest files and the smallest safe diff.
 - Prefer repeated simple code over a premature abstraction.
+
+For code you write or modify:
+
+- Keep control flow shallow. Prefer early returns and `continue` statements over nested branches.
+- Extract recurring, meaningful, or specification-defined literals into named constants. Keep self-explanatory one-off values inline.
+- Keep symbols private until external access is required by the design.
 
 For product code, remove obsolete paths instead of preserving compatibility. Libraries and SDKs can need backward compatibility.
 
