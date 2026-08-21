@@ -225,12 +225,13 @@ export default function (pi: ExtensionAPI) {
 
         const theme = ctx.ui.theme
         const modelId = ctx.model?.id ?? "no-model"
-        const topRightRaw = `${compactModelId(modelId, Math.max(8, Math.floor(innerWidth * 0.3)))} · ${formatThinking(pi.getThinkingLevel())}`
-        const topRight = theme.fg("muted", ` ${topRightRaw} `)
-        const bottomLeft = theme.fg(
-          contextStatusColor(ctx),
-          ` ${formatCost(ctx)} · ${formatContext(ctx)} `
-        )
+        const modelPart = `${compactModelId(modelId, Math.max(8, Math.floor(innerWidth * 0.3)))} · ${formatThinking(pi.getThinkingLevel())}`
+        const usagePart = `${formatCost(ctx)} · ${formatContext(ctx)}`
+        const modelOnly = ` ${theme.fg("muted", modelPart)} `
+        const combined = ` ${theme.fg(contextStatusColor(ctx), usagePart)} ${theme.fg("muted", `· ${modelPart}`)} `
+        // Drop the cost/context segment as a unit when it doesn't fit, rather
+        // than letting borderWithLabels's tail-truncation eat into the model id.
+        const topRight = visibleWidth(combined) <= innerWidth ? combined : modelOnly
         const bottomRight = theme.fg(
           "muted",
           ` ${compactPath(ctx.cwd)}${branch ? ` (${branch})` : ""} `
@@ -240,7 +241,7 @@ export default function (pi: ExtensionAPI) {
           ...Array.from({ length: TOP_MARGIN_LINES }, () => ""),
           this.borderWithLabels(width, "", topRight),
           ...visibleBody.map((line) => this.wrapBody(line, innerWidth)),
-          this.borderWithLabels(width, bottomLeft, bottomRight, "╰", "╯"),
+          this.borderWithLabels(width, "", bottomRight, "╰", "╯"),
           ...this.wrapPopupBlock(popupLines, width),
         ]
       }
