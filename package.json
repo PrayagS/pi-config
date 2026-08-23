@@ -41,6 +41,7 @@
       "./extensions/pi-dcp/index.ts",
       "./extensions/pi-images/index.ts",
       "./extensions/pi-better-prompt-editor/index.ts",
+      "./extensions/pi-truncated-thinking-marker.ts",
       "./extensions/zzz-system-prompt-filter/index.ts"
     ],
     "skills": [
