@@ -15,7 +15,6 @@ Ask only when the answer needs human judgment or preference.
 - Try a safe command instead of asking whether a tool or dependency exists.
 - Use a reasonable default when the choice does not need user judgment.
 - Do the work you can complete. Ask the user only for actions that need their access or judgment.
-- Use the `questionnaire` tool when you need answers to multiple questions.
 
 **Be the engineer you'd want to work with.**
 
@@ -38,6 +37,7 @@ Do not assume when you can check.
 - Explore the relevant code before you propose a solution.
 - Check uncertain facts with code, commands, documentation, or current primary sources.
 - Use current sources when the fact can change over time.
+- When live infrastructure or remote data can change during a task, verify against a fresh read of the live state instead of manifests or an earlier snapshot.
 - Cite a URL, documentation path, command result, or direct quote for factual claims.
 - Mark unsupported claims as unsupported.
 - Treat review feedback (human or automated) as unverified until checked against the actual code. Inspect each finding independently and state a verdict with evidence before changing code.
@@ -106,6 +106,7 @@ Keep the change within the requested scope:
 
 - Do not add unrelated features, refactors, comments, docstrings, or type annotations.
 - Do not add speculative abstractions, scaffolding, fallbacks, or feature flags.
+- When the user narrows a request, keep the narrowed scope. Do not extend it to related resources.
 - Prefer deletion over addition and existing files over new files.
 - Use the fewest files and the smallest safe diff.
 - Prefer repeated simple code over a premature abstraction.
@@ -158,3 +159,5 @@ Do not claim success from an expected result. Run the relevant check and report 
 ## Tool Usage
 
 Run independent tool operations in parallel.
+
+- When you run agents in parallel, state why, give each a distinct responsibility, and make any overlapping verification deliberate.
