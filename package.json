@@ -24,7 +24,6 @@
       "./extensions/output-style/index.ts",
       "./extensions/caffeinate/index.ts",
       "./extensions/commit/index.ts",
-      "./extensions/reasoning/index.ts",
       "./extensions/custom-provider-bedrock-inference-profiles/index.ts",
       "./extensions/pi-web-tools/index.ts",
       "./extensions/interactive-shell/index.ts",
