@@ -161,3 +161,4 @@ Do not claim success from an expected result. Run the relevant check and report 
 Run independent tool operations in parallel.
 
 - When you run agents in parallel, state why, give each a distinct responsibility, and make any overlapping verification deliberate.
+- When the user should be able to watch, steer, or take over delegated work, read the `subagents` skill and give each worker its own Herdr tab.
