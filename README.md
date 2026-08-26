@@ -36,6 +36,7 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/questionnaire/` — structured question UI tool
 - `extensions/sandbox/` — command sandboxing
 - `extensions/tools/` — tooling controls
+- `extensions/vent/` — `vent` tool logging workflow friction to a shared JSONL log at `~/.pi/agent/vent.jsonl`, with `/vent-export`, `/vent-review`, and `/vent-archive` commands
 - `extensions/working-indicator/` — phase-aware working spinner (thinking/tool/streaming/working)
 - `extensions/pi-images/` — image attachments with kitty graphics preview ([credits](extensions/pi-images/README.md#credits))
 - `extensions/zzz-system-prompt-filter/` — system prompt filtering

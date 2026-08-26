@@ -36,6 +36,7 @@
       "./extensions/questionnaire/index.ts",
       "./extensions/sandbox/index.ts",
       "./extensions/tools/index.ts",
+      "./extensions/vent/index.ts",
       "./extensions/working-indicator/index.ts",
       "./extensions/pi-dcp/index.ts",
       "./extensions/pi-images/index.ts",
