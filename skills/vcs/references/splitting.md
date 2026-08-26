@@ -72,12 +72,12 @@ cat spec.json | jj-hunk commit - "commit message"
 jj-hunk list
 
 jj-hunk split '{"files": {"src/db/schema.ts": {"action": "keep"}}, "default": "reset"}' \
-  "feat: add database schema"
+  "db: add database schema"
 
 jj-hunk split '{"files": {"src/lib/utils.ts": {"hunks": [0, 2]}}, "default": "reset"}' \
-  "refactor: clean up utils"
+  "utils: clean up helpers"
 
-jj commit -m "feat: add new endpoint"
+jj commit -m "api: add new endpoint"
 
 jj log -r 'trunk()..@'
 ```
@@ -101,7 +101,7 @@ git --no-pager diff --no-color --no-ext-diff
 ```bash
 git add <files-for-group>
 git --no-pager diff --cached --no-color --no-ext-diff
-git commit -m "type(scope): summary" -m "Body..."
+git commit -m "scope: summary" -m "Body..."
 ```
 
 ### Hunk-Level Split
@@ -111,7 +111,7 @@ Interactive patch mode can be acceptable when user is driving terminal interacti
 ```bash
 git add -p <files>
 git --no-pager diff --cached --no-color --no-ext-diff
-git commit -m "type(scope): summary" -m "Body..."
+git commit -m "scope: summary" -m "Body..."
 ```
 
 If patch mode is not safe, split by editing files directly, staging the intended file state, committing, then restoring/reapplying remaining changes from saved diff only if necessary. Prefer asking before complex manual hunk surgery.

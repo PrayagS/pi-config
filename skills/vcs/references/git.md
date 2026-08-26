@@ -45,7 +45,7 @@ git --no-pager diff --no-color --no-ext-diff
 git --no-pager diff --cached --no-color --no-ext-diff
 git log -n 50 --pretty=format:%s
 git add <intended-files>
-git commit -m "type(scope): summary" -m "Body..."
+git commit -m "scope: summary" -m "Body..."
 ```
 
 ### Branch / Checkout

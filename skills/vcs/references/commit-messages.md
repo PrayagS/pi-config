@@ -1,38 +1,24 @@
 # Commit Messages
 
-Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) format for git commits and jj descriptions.
+Use [Scoped Commits](https://scopedcommits.com/) for normal git commits and jj descriptions. Put the affected area first so contributors can scan history by subsystem. This keeps the commit log focused on its developer audience rather than treating it as a generated changelog. Explicit repository-specific commit rules take precedence.
 
 ## Format
 
 ```
-<type>[optional scope]: <description>
+<scope>: <description>
 
 [optional body]
 
-[optional footer(s)]
+[optional trailer(s)]
 ```
 
-## Type
-
-| Type | When to use |
-|------|-------------|
-| `feat` | New feature or capability |
-| `fix` | Bug fix |
-| `docs` | Documentation only (README, comments, docstrings) |
-| `style` | Formatting, whitespace, semicolons; no logic change |
-| `refactor` | Code restructuring; no new feature or bug fix |
-| `perf` | Performance improvement |
-| `test` | Adding or updating tests |
-| `build` | Build system or external dependencies |
-| `ci` | CI configuration and scripts |
-| `chore` | Maintenance tasks, tooling, misc |
-| `revert` | Reverting a previous commit |
+Treat type labels such as `feat`, `fix`, `docs`, and `refactor` as redundant with the description. Omit them unless one is the repository's actual scope or its required format.
 
 ## Scope
 
-Optional short noun in parentheses, e.g. `feat(api):`, `fix(parser):`.
+Use the subsystem, area, module, package path, service, or other project-relevant subject touched by the change.
 
-Check recent history for common scopes:
+Before choosing a scope, check repository guidance and recent history for established names:
 
 ```bash
 # jj
@@ -42,25 +28,43 @@ jj log -n 50 --no-graph -T 'description.first_line() ++ "\n"'
 git log -n 50 --pretty=format:%s
 ```
 
+Examples:
+
+- `auth: reject expired sessions`
+- `net/http/cookiejar: add documentation links`
+- `vcs: document commit message rules`
+
+For a commit spanning multiple scopes, use the first applicable option:
+
+1. A broader scope that contains all affected areas.
+2. Multiple scopes separated by commas, such as `api,cli: rename output field`.
+3. `treewide`, `all`, or `global` for a repository-wide change, following local history.
+
+When no useful scope exists, treat the change as a special commit and write a clear unscoped description.
+
 ## Description
 
 - Required.
-- Short imperative summary: `add Polish language`, not `added Polish language`.
-- Lowercase first word.
-- No trailing period.
+- Summarize the change briefly in the imperative mood: `add Polish language`, not `added Polish language`.
+- Start with a lowercase word unless it is a proper noun or identifier.
+- Omit the trailing period.
 
 ## Body
 
-Strongly encouraged unless change is trivially obvious. Explain what changed, why, and approach taken. Reader of `jj log` / `git log` should understand change without opening diff.
+Strongly encouraged unless the change is trivially obvious. Explain what changed, why, and any non-obvious approach or trade-off. A reader should understand the change without opening the diff.
 
-## Footers
+## Trailers
 
-Optional. Use `token: value` or `token #value` format.
+Optional. Use the repository's established trailer format.
 
-Common footers:
+Common trailers:
 
 - `Refs: #123`
 - `Co-authored-by: Name <email>`
+
+## Special Commits
+
+Reverts, merges, and other special commits may use their tool-generated or repository-defined format.
 
 ## Rules
 

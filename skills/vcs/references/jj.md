@@ -56,7 +56,7 @@ jj new -m "message"
 4. Use `jj commit -m` to finalize current work. It describes `@` and creates a new empty working-copy commit:
 
 ```bash
-jj commit -m "feat: add feature"
+jj commit -m "api: add endpoint"
 ```
 
 ## Plain-Text Output
@@ -81,8 +81,8 @@ jj op log
 
 ```bash
 jj new
-jj new -m "feat: new work"
-jj new main -m "feat: ..."
+jj new -m "api: start endpoint work"
+jj new main -m "api: ..."
 jj new x y -m "merge: ..."
 jj edit <change-id>
 jj edit @-
@@ -133,7 +133,7 @@ When committing/describing work, also read `commit-messages.md`.
 jj st
 jj --color=never --no-pager diff
 jj log -n 50 --no-graph -T 'description.first_line() ++ "\n"'
-jj commit -m "type(scope): summary
+jj commit -m "scope: summary
 
 Body..."
 ```
