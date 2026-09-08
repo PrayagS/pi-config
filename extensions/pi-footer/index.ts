@@ -48,10 +48,9 @@ const STATUS_ORDER: string[] = [
   "pi-hindsight",
   "link",
 ]
-const HIDDEN_STATUS_IDS = new Set<string>([
-  // "executor",
-])
+const HIDDEN_STATUS_IDS = new Set<string>(["hunk"])
 const HIDDEN_STATUS_TEXT_INCLUDES = [
+  "hunk",
   // "executor down",
   // "proj today",
 ].map((s) => s.toLowerCase())
