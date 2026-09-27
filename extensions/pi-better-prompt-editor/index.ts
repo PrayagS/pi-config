@@ -22,7 +22,7 @@ const STATUS_ROW_GAP_LINES = 0
 const INSTALL_DELAY_MS = 0
 
 const STATUS_ORDER = ["sandbox", "caveman", "mcp", "pi-hindsight", "link"]
-const HIDDEN_STATUS_IDS = new Set<string>([])
+const HIDDEN_STATUS_IDS = new Set<string>(["hunk"])
 const HIDDEN_STATUS_TEXT_INCLUDES = [
   // Border already renders cwd/model/thinking/context/cost.
   "ctx ",
@@ -33,7 +33,13 @@ const SHOW_STATUS_IDS = process.env.SHOW_STATUS_IDS
 const ESC = String.fromCharCode(27)
 const BEL = String.fromCharCode(7)
 const CURSOR_MARKER = `${ESC}_pi:c${BEL}`
-const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;]*m`, "g")
+// An internal render boundary, removed before any rows reach the terminal.
+const EDITOR_BODY_END = `${ESC}_pi-better-prompt-editor:body-end${BEL}`
+const VIM_EDITOR = Symbol.for("pi-vim-editor")
+type VimCapability = {
+  version: number
+  status(): { mode: string; pending: string; label: string }
+}
 
 function compactPath(cwd: string): string {
   const home = homedir()
@@ -42,20 +48,12 @@ function compactPath(cwd: string): string {
   return cwd
 }
 
-function isEditorRule(line: string): boolean {
-  const plain = line.replace(ANSI_PATTERN, "").trim()
-  return (
-    plain.includes("─") &&
-    [...plain].every((char) => "─↑↓ 0123456789more".includes(char))
-  )
-}
-
 function splitEditorRender(lines: string[]): {
   editorLines: string[]
   popupLines: string[]
 } {
   const withoutTop = lines.slice(1)
-  const bottomRuleIndex = withoutTop.findIndex(isEditorRule)
+  const bottomRuleIndex = withoutTop.indexOf(EDITOR_BODY_END)
 
   if (bottomRuleIndex === -1) {
     return { editorLines: withoutTop, popupLines: [] }
@@ -194,13 +192,17 @@ export default function (pi: ExtensionAPI) {
     void refreshBranch(ctx)
 
     class BorderStatusEditor extends CustomEditor {
+      private renderingBody = false
+
       constructor(
         tui: TUI,
         theme: EditorTheme,
         keybindings: KeybindingsManager
       ) {
         super(tui, theme, keybindings, { paddingX: 1 })
-        this.borderColor = ctx.ui.theme.getThinkingBorderColor(pi.getThinkingLevel())
+        this.borderColor = ctx.ui.theme.getThinkingBorderColor(
+          pi.getThinkingLevel()
+        )
         activeTui = tui
       }
 
@@ -209,7 +211,7 @@ export default function (pi: ExtensionAPI) {
         if (width < 12) return super.render(width)
 
         const innerWidth = Math.max(1, width - 2)
-        const base = super.render(innerWidth)
+        const base = this.renderBody(innerWidth)
         const { editorLines, popupLines } = splitEditorRender(base)
         const body = [...editorLines]
         const maxBodyLines = Math.max(
@@ -231,7 +233,18 @@ export default function (pi: ExtensionAPI) {
         const combined = ` ${theme.fg(contextStatusColor(ctx), usagePart)} ${theme.fg("muted", `· ${modelPart}`)} `
         // Drop the cost/context segment as a unit when it doesn't fit, rather
         // than letting borderWithLabels's tail-truncation eat into the model id.
-        const topRight = visibleWidth(combined) <= innerWidth ? combined : modelOnly
+        const topRight =
+          visibleWidth(combined) <= innerWidth ? combined : modelOnly
+        const vim = (
+          this as unknown as Record<symbol, VimCapability | undefined>
+        )[VIM_EDITOR]
+        const status = vim?.version === 1 ? vim.status() : undefined
+        const bottomLeft = status
+          ? theme.fg(
+              status.mode === "insert" && !status.pending ? "muted" : "accent",
+              ` ${status.label} `
+            )
+          : ""
         const bottomRight = theme.fg(
           "muted",
           ` ${compactPath(ctx.cwd)}${branch ? ` (${branch})` : ""} `
@@ -241,9 +254,30 @@ export default function (pi: ExtensionAPI) {
           ...Array.from({ length: TOP_MARGIN_LINES }, () => ""),
           this.borderWithLabels(width, "", topRight),
           ...visibleBody.map((line) => this.wrapBody(line, innerWidth)),
-          this.borderWithLabels(width, "", bottomRight, "╰", "╯"),
+          this.borderWithLabels(width, bottomLeft, bottomRight, "╰", "╯"),
           ...this.wrapPopupBlock(popupLines, width),
         ]
+      }
+
+      private renderBody(width: number): string[] {
+        this.renderingBody = true
+        try {
+          return super.render(width)
+        } finally {
+          this.renderingBody = false
+        }
+      }
+
+      protected override renderBottomBorder(
+        width: number,
+        hidden: number
+      ): string {
+        // Don't guess which row is a border from its text: decorators can
+        // label it, and the prompt itself can contain horizontal rules.
+        // This marker also leaves no dashes for Vim to label inside the box.
+        return this.renderingBody
+          ? EDITOR_BODY_END
+          : super.renderBottomBorder(width, hidden)
       }
 
       private getCurrentBorderColor(): (text: string) => string {

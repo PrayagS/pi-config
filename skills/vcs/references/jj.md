@@ -132,7 +132,7 @@ When committing/describing work, also read `commit-messages.md`.
 ```bash
 jj st
 jj --color=never --no-pager diff
-jj log -n 50 --no-graph -T 'description.first_line() ++ "\n"'
+jj log -n 50 --no-graph -T 'description.first_line() ++ "\n"'  # existing scope names only; ignore feat/fix-style prefixes
 jj commit -m "scope: summary
 
 Body..."

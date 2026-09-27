@@ -1,6 +1,8 @@
 # Commit Messages
 
-Use [Scoped Commits](https://scopedcommits.com/) for normal git commits and jj descriptions. Put the affected area first so contributors can scan history by subsystem. This keeps the commit log focused on its developer audience rather than treating it as a generated changelog. Explicit repository-specific commit rules take precedence.
+Use [Scoped Commits](https://scopedcommits.com/) for normal git commits and jj descriptions. Put the affected area first so contributors can scan history by subsystem. This keeps the commit log focused on its developer audience rather than treating it as a generated changelog.
+
+Only explicit, written repository rules override this format: a commit convention in `CONTRIBUTING.md`, `AGENTS.md`/`CLAUDE.md`, or similar docs, or an enforced commit-lint config (e.g. `commitlint.config.*`, a `commit-msg` hook). Commit history alone is never such a rule: if past commits use Conventional Commits (`feat:`, `fix(api):`, ...), still write scoped commits.
 
 ## Format
 
@@ -12,13 +14,13 @@ Use [Scoped Commits](https://scopedcommits.com/) for normal git commits and jj d
 [optional trailer(s)]
 ```
 
-Treat type labels such as `feat`, `fix`, `docs`, and `refactor` as redundant with the description. Omit them unless one is the repository's actual scope or its required format.
+Do not use type prefixes such as `feat`, `fix`, `docs`, `chore`, or `refactor`, with or without a parenthesized scope. The description already says what kind of change it is. The only exception is an explicit written rule as described above.
 
 ## Scope
 
 Use the subsystem, area, module, package path, service, or other project-relevant subject touched by the change.
 
-Before choosing a scope, check repository guidance and recent history for established names:
+Before choosing a scope, check repository guidance and recent history for established scope **names**. Use history only to reuse names; do not copy its format. In Conventional Commit history, the name is the part in parentheses: `fix(auth): ...` means scope `auth`, so write `auth: ...`.
 
 ```bash
 # jj
@@ -38,7 +40,7 @@ For a commit spanning multiple scopes, use the first applicable option:
 
 1. A broader scope that contains all affected areas.
 2. Multiple scopes separated by commas, such as `api,cli: rename output field`.
-3. `treewide`, `all`, or `global` for a repository-wide change, following local history.
+3. `treewide`, `all`, or `global` for a repository-wide change, reusing whichever name local history uses.
 
 When no useful scope exists, treat the change as a special commit and write a clear unscoped description.
 

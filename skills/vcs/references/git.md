@@ -43,7 +43,7 @@ When committing or writing commit messages, also read `commit-messages.md`.
 git --no-pager status --short
 git --no-pager diff --no-color --no-ext-diff
 git --no-pager diff --cached --no-color --no-ext-diff
-git log -n 50 --pretty=format:%s
+git log -n 50 --pretty=format:%s  # existing scope names only; ignore feat/fix-style prefixes
 git add <intended-files>
 git commit -m "scope: summary" -m "Body..."
 ```
