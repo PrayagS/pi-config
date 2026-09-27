@@ -60,4 +60,4 @@ Read extra topic references only when needed:
 3. Avoid interactive commands that open editors or TUIs.
 4. After mutating operations, verify status.
 5. If caller provides file paths/globs, operate only on intended files.
-6. If unrelated or ambiguous changes exist, ask before including them.
+6. Commit only changes belonging to the task. If unrelated or ambiguous changes exist, ask before including them.
