@@ -43,6 +43,7 @@
       "./extensions/pi-better-prompt-editor/index.ts",
       "./extensions/pi-truncated-thinking-marker.ts",
       "./extensions/zzz-system-prompt-filter/index.ts"
+      "./extensions/anthropic-stall-probe/index.ts"
     ],
     "skills": [
       "./skills"
@@ -64,6 +65,7 @@
     "test:caffeinate": "bun test extensions/caffeinate/index.test.ts",
     "test:co-authored-by": "bun test extensions/pi-co-authored-by/index.test.ts",
     "test:output-style": "bun test extensions/output-style/index.test.ts"
+    "test:anthropic-stall-probe": "node --test extensions/anthropic-stall-probe/probe.test.ts"
   },
   "dependencies": {
     "defuddle": "^0.18.1",
