@@ -38,8 +38,18 @@ function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-function cliError(stderr: string, code: number) {
-  const message = stderr.replace(/\s+/g, " ").trim().slice(0, 300)
+/** With --error-format json, kagi-cli writes {code, category, retryable, message} to stderr. */
+export function cliError(stderr: string, code: number) {
+  let message = stderr.trim()
+  try {
+    const parsed = JSON.parse(message)
+    if (typeof parsed?.message === "string") {
+      message = typeof parsed.code === "string" ? `${parsed.code}: ${parsed.message}` : parsed.message
+    }
+  } catch {
+    // Plain-text error (older CLI or a crash before JSON output).
+  }
+  message = message.replace(/\s+/g, " ").slice(0, 300)
   return message ? `kagi exited ${code}: ${message}` : `kagi exited ${code}`
 }
 
@@ -61,6 +71,8 @@ export function createKagiSummaryExtractor(pi: ExtensionAPI) {
           "kagi",
           [
             "summarize",
+            "--error-format",
+            "json",
             "--subscriber",
             "--length",
             "long",

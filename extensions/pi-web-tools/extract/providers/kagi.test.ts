@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { createKagiSummaryExtractor, parseKagiSummary } from "./kagi"
+import { cliError, createKagiSummaryExtractor, parseKagiSummary } from "./kagi"
 
 // Shape observed from `kagi summarize --subscriber` (kagi-cli 0.24.0).
 const KAGI_HTML =
@@ -35,5 +35,30 @@ describe("kagi summary parsing", () => {
     const out = await createKagiSummaryExtractor(pi)({ urls: ["https://example.com"], mode: "summary" })
     expect(out?.[0]).toMatchObject({ title: "Example Domain", source: "kagi", metadata: { thread_id: "t-1" } })
     expect(out?.[0]?.content).not.toContain("<")
+  })
+})
+
+describe("kagi CLI errors", () => {
+  test("requests JSON errors and reports their code and message", async () => {
+    const calls: string[][] = []
+    const stderr = JSON.stringify({
+      code: "auth_error",
+      category: "auth",
+      retryable: false,
+      message: "auth error: session token expired",
+    })
+    const pi = {
+      exec: async (_cmd: string, args: string[]) => {
+        calls.push(args)
+        return { stdout: "", stderr, code: 1 }
+      },
+    } as any
+    const out = await createKagiSummaryExtractor(pi)({ urls: ["https://example.com"], mode: "summary" })
+    expect(calls[0].slice(0, 3)).toEqual(["summarize", "--error-format", "json"])
+    expect(out?.[0]?.error).toBe("kagi exited 1: auth_error: auth error: session token expired")
+  })
+
+  test("falls back to plain stderr", () => {
+    expect(cliError("boom\n", 2)).toBe("kagi exited 2: boom")
   })
 })
