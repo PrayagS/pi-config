@@ -49,6 +49,11 @@ function normalizeDate(value: unknown) {
   return text(value)
 }
 
+function capContent(value: string | undefined) {
+  if (!value || value.length <= CONTENT_MAX_CHARS) return value
+  return `${value.slice(0, CONTENT_MAX_CHARS)}\n\n[\u2026truncated; use web_fetch for the full page]`
+}
+
 function warningMessages(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined
   const messages = value
@@ -81,9 +86,14 @@ function normalizeResult(item: any, source: string): WebSearchResult | null {
   return {
     title: firstText(item?.title, item?.name) ?? url,
     url,
-    snippet,
+    snippet: capContent(snippet),
     published: normalizeDate(
-      item?.published ?? item?.publishedDate ?? item?.publish_date ?? item?.date ?? item?.page_age
+      item?.published ??
+        item?.publishedDate ??
+        item?.publish_date ??
+        item?.published_date ??
+        item?.date ??
+        item?.page_age
     ),
     source,
   }
@@ -169,6 +179,8 @@ export const searchTavily: WebSearchProvider = async ({
       search_depth: "basic",
       chunks_per_source: 1,
       time_range: age,
+      // published_date is omitted from results unless requested (or topic=news).
+      include_published_date: true,
       include_domains: includeDomains,
       exclude_domains: excludeDomains,
       include_raw_content: includeContent ? "markdown" : false,

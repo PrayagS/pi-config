@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { CONTENT_MAX_CHARS, searchExa, searchParallel } from "./providers"
+import { CONTENT_MAX_CHARS, searchExa, searchParallel, searchTavily } from "./providers"
 
 const KEYS = [
   "WEB_TOOLS_EXA_API_KEY",
@@ -89,5 +89,27 @@ describe("exa", () => {
   test("keeps highlights for the default snippet path", async () => {
     await searchExa({ query: "q", limit: 10 })
     expect(requests[0].body.contents).toEqual({ highlights: true, livecrawlTimeout: 5000 })
+  })
+})
+
+describe("tavily", () => {
+  test("requests published dates and caps raw_content", async () => {
+    respond = () =>
+      json({
+        results: [
+          {
+            url: "https://a.dev",
+            title: "A",
+            content: "short",
+            raw_content: "x".repeat(CONTENT_MAX_CHARS + 100),
+            published_date: "2026-10-01",
+          },
+        ],
+      })
+    const out = await searchTavily({ query: "q", limit: 5, includeContent: true })
+    expect(requests[0].body.include_published_date).toBe(true)
+    expect(out?.results[0].published).toBe("2026-10-01")
+    expect(out?.results[0].snippet?.startsWith("x".repeat(CONTENT_MAX_CHARS))).toBe(true)
+    expect(out?.results[0].snippet).toContain("truncated; use web_fetch")
   })
 })
