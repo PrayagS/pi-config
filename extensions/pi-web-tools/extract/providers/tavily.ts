@@ -1,6 +1,6 @@
 import { extractTavily } from "../../providers/tavily"
 import type { WebExtractItem, WebExtractProviderParams } from "./types"
-import { emptyScatter, hasAny, matchResults, selectPending, urlSet } from "./utils"
+import { emptyScatter, hasAny, matchResults, scatterErrors, selectPending, urlSet } from "./utils"
 
 function failedUrls(json: any): Set<string> {
   return urlSet(
@@ -52,5 +52,13 @@ export async function extractTavilyTargeted({
     }
   }
 
+  scatterErrors(
+    output,
+    selected,
+    (Array.isArray(json?.failed_results) ? json.failed_results : []).map((item: any) => ({
+      url: item?.url,
+      message: typeof item?.error === "string" ? item.error : "extraction failed",
+    }))
+  )
   return hasAny(output) ? output : null
 }

@@ -14,44 +14,51 @@ function pendingMask(results: WebExtractItem[]): boolean[] {
   return results.map((item) => !item.source)
 }
 
-function markMissing(results: WebExtractItem[]) {
-  for (const item of results) {
-    if (!item.source) item.error = "No provider returned content for this URL"
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Run one provider and merge its output. Items with a `source` fill pending URLs;
+ * items with only an `error`, and thrown errors, are recorded per URL as
+ * "provider: reason".
+ */
+async function runProvider(
+  name: string,
+  provider: WebExtractProvider,
+  params: Omit<WebExtractProviderParams, "pending" | "signal">,
+  results: WebExtractItem[],
+  errors: string[][],
+  signal?: AbortSignal
+) {
+  const pending = pendingMask(results)
+  let providerResults: Array<WebExtractItem | null> | null
+  try {
+    providerResults = await provider({ ...params, pending, signal })
+  } catch (error) {
+    if (signal?.aborted) throw error
+    for (const [index, isPending] of pending.entries()) {
+      if (isPending) errors[index].push(`${name}: ${errorMessage(error)}`)
+    }
+    return
+  }
+  if (!providerResults) return
+
+  for (const [index, item] of providerResults.entries()) {
+    if (!item || results[index].source) continue
+    if (item.source) results[index] = item
+    else if (item.error) errors[index].push(`${name}: ${item.error}`)
   }
 }
 
-async function runEnvStage(
-  params: Omit<WebExtractProviderParams, "pending" | "signal">,
-  providersByName: Record<string, WebExtractProvider>,
-  supportedStages: Record<string, string[]>,
-  signal?: AbortSignal
-): Promise<WebExtractOutput | null> {
-  const envStage = process.env.WEB_TOOLS_EXTRACT_STAGE
-  if (!envStage) return null
-
-  if (!supportedStages[params.mode].includes(envStage)) {
-    throw new Error(
-      `Stage "${envStage}" not supported for ${params.mode}. Supported: ${supportedStages[params.mode].join(", ")}`
-    )
-  }
-
-  const provider = providersByName[envStage]
-  const providerResults = await provider({
-    ...params,
-    pending: params.urls.map(() => true),
-    signal,
-  })
-  if (!providerResults) throw new Error(`Extractor "${envStage}" returned no content`)
-
-  const results: WebExtractItem[] = params.urls.map(
-    (url, index) => providerResults[index] ?? { url }
-  )
-  markMissing(results)
-
-  return {
-    mode: params.mode,
-    prompt: params.prompt,
-    results,
+function markMissing(results: WebExtractItem[], errors: string[][]) {
+  for (const [index, item] of results.entries()) {
+    if (item.source) continue
+    const reasons = errors[index]
+    item.error =
+      reasons.length > 0
+        ? `No provider returned content for this URL (${reasons.join("; ")})`
+        : "No provider returned content for this URL"
   }
 }
 
@@ -61,39 +68,45 @@ export async function runWebExtract(
   signal?: AbortSignal
 ): Promise<WebExtractOutput> {
   const extractKagiSummary = createKagiSummaryExtractor(pi)
-  const providersByName = {
+  const providersByName: Record<string, WebExtractProvider> = {
     firecrawl: extractFirecrawlSummary,
     exa: extractExa,
     parallel: extractParallelTargeted,
     tavily: extractTavilyTargeted,
     kagi: extractKagiSummary,
   }
-  const summaryProviders = [extractFirecrawlSummary, extractExa, extractKagiSummary]
-  const targetedProviders = [extractExa, extractParallelTargeted, extractTavilyTargeted]
   const supportedStages = {
     summary: ["firecrawl", "exa", "kagi"],
     targeted: ["exa", "parallel", "tavily"],
   }
 
-  const envResult = await runEnvStage(params, providersByName, supportedStages, signal)
-  if (envResult) return envResult
+  const envStage = process.env.WEB_TOOLS_EXTRACT_STAGE
+  if (envStage && !supportedStages[params.mode].includes(envStage)) {
+    throw new Error(
+      `Stage "${envStage}" not supported for ${params.mode}. Supported: ${supportedStages[params.mode].join(", ")}`
+    )
+  }
+  const order = envStage ? [envStage] : supportedStages[params.mode]
 
   const results: WebExtractItem[] = params.urls.map((url) => ({ url }))
-  const providers = params.mode === "summary" ? summaryProviders : targetedProviders
+  const errors: string[][] = params.urls.map(() => [])
 
-  for (const provider of providers) {
-    const pending = pendingMask(results)
-    if (!pending.some(Boolean)) break
-
-    const providerResults = await provider({ ...params, pending, signal })
-    if (!providerResults) continue
-
-    for (const [index, item] of providerResults.entries()) {
-      if (item && !results[index].source) results[index] = item
-    }
+  for (const name of order) {
+    if (signal?.aborted) throw new Error("cancelled")
+    if (!pendingMask(results).some(Boolean)) break
+    await runProvider(name, providersByName[name], params, results, errors, signal)
   }
 
-  markMissing(results)
+  if (envStage && !results.some((item) => item.source)) {
+    const reasons = errors.flat()
+    throw new Error(
+      reasons.length > 0
+        ? `Extractor "${envStage}" returned no content: ${reasons.join("; ")}`
+        : `Extractor "${envStage}" returned no content`
+    )
+  }
+
+  markMissing(results, errors)
 
   return {
     mode: params.mode,

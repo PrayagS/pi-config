@@ -1,10 +1,18 @@
-import { postJson } from "./http"
+// Throws on HTTP/network errors; returns null only when the API key is unset.
+import { postJsonOrThrow as postJson } from "./http"
 
 export interface ExaContentsParams {
   urls?: string[]
   ids?: string[]
   text?: boolean | Record<string, unknown>
   summary?: boolean | Record<string, unknown>
+}
+
+/** Readable reason for a non-success entry in /contents `statuses`. */
+export function exaStatusError(status: any): string {
+  const tag = typeof status?.error?.tag === "string" ? status.error.tag : "error"
+  const code = status?.error?.httpStatusCode
+  return code ? `${tag} (HTTP ${code})` : tag
 }
 
 export async function getExaContents(

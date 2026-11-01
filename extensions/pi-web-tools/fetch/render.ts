@@ -34,6 +34,13 @@ export function renderResult(
     text += `\n${theme.fg("muted", `  ${meta}`)}`
   }
 
+  if (Array.isArray(d?.providerErrors) && d.providerErrors.length > 0) {
+    text += `\n${theme.fg("warning", `  \u26a0 ${d.providerErrors.length} provider(s) failed before ${source}`)}`
+    if (expanded) {
+      text += `\n${theme.fg("dim", d.providerErrors.map((e: string) => `  ${e}`).join("\n"))}`
+    }
+  }
+
   if (d?.fullOutputPath) {
     text += `\n${theme.fg("muted", `Full output: ${d.fullOutputPath}`)}`
   }

@@ -1,10 +1,55 @@
 import { fetchMarkdownViaContentNegotiation } from "./content-negotiation"
 import { defuddle } from "./defuddle"
 import { apiExtractors, firecrawl, jina, you } from "./extractors"
+import type { Extractor } from "./extractors"
 import { buildResult } from "./result"
 import type { FetchResult } from "./result"
 
 export type { ExtractionStage, FetchResult } from "./result"
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Try extractors in order and return the first result. Failures are recorded as
+ * "name: reason" so the final result (or error) can say why each one was skipped.
+ */
+async function firstExtracted(
+  url: string,
+  extractors: Extractor[],
+  rawHtml: boolean,
+  errors: string[],
+  signal?: AbortSignal
+): Promise<FetchResult | null> {
+  for (const extractor of extractors) {
+    if (signal?.aborted) throw new Error("cancelled")
+    try {
+      const result = await extractor.extract(url, signal, rawHtml ? { rawHtml } : undefined)
+      if (result) return buildResult(url, result, extractor.name, rawHtml)
+    } catch (error) {
+      if (signal?.aborted) throw error
+      errors.push(`${extractor.name}: ${errorMessage(error)}`)
+    }
+  }
+  return null
+}
+
+/** Run the last-resort local extraction, keeping provider errors in the result. */
+async function finalFallback(
+  url: string,
+  markdown: boolean,
+  errors: string[],
+  signal?: AbortSignal
+): Promise<FetchResult> {
+  try {
+    const result = await defuddle(url, markdown, signal)
+    return errors.length > 0 ? { ...result, providerErrors: errors } : result
+  } catch (error) {
+    if (errors.length === 0) throw error
+    throw new Error(`${errorMessage(error)}. Providers tried: ${errors.join("; ")}`)
+  }
+}
 
 async function runEnvStage(
   url: string,
@@ -25,7 +70,12 @@ async function runEnvStage(
   const extractors = rawHtml ? [jina, firecrawl, you] : apiExtractors
   const extractor = extractors.find((e) => e.name === envStage)
   if (extractor) {
-    const extracted = await extractor.extract(url, signal, { rawHtml })
+    let extracted: Awaited<ReturnType<Extractor["extract"]>>
+    try {
+      extracted = await extractor.extract(url, signal, { rawHtml })
+    } catch (error) {
+      throw new Error(`Extractor "${envStage}" failed: ${errorMessage(error)}`)
+    }
     if (extracted) return buildResult(url, extracted, extractor.name, rawHtml)
     throw new Error(
       rawHtml
@@ -50,12 +100,11 @@ export async function fetchRawHtml(
   const envResult = await runEnvStage(url, true, signal)
   if (envResult) return envResult
 
-  for (const extractor of [jina, firecrawl, you]) {
-    const result = await extractor.extract(url, signal, { rawHtml: true })
-    if (result) return buildResult(url, result, extractor.name, true)
-  }
+  const errors: string[] = []
+  const result = await firstExtracted(url, [jina, firecrawl, you], true, errors, signal)
+  if (result) return errors.length > 0 ? { ...result, providerErrors: errors } : result
 
-  return defuddle(url, false, signal)
+  return finalFallback(url, false, errors, signal)
 }
 
 export async function fetchAndExtract(
@@ -68,10 +117,9 @@ export async function fetchAndExtract(
   const markdownResult = await fetchMarkdownViaContentNegotiation(url, signal)
   if (markdownResult) return markdownResult
 
-  for (const extractor of apiExtractors) {
-    const result = await extractor.extract(url, signal)
-    if (result) return buildResult(url, result, extractor.name)
-  }
+  const errors: string[] = []
+  const result = await firstExtracted(url, apiExtractors, false, errors, signal)
+  if (result) return errors.length > 0 ? { ...result, providerErrors: errors } : result
 
-  return defuddle(url, true, signal)
+  return finalFallback(url, true, errors, signal)
 }

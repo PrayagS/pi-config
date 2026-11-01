@@ -9,12 +9,12 @@ export const jina: Extractor = {
 
     if (options?.rawHtml) {
       const html = json?.data?.html || json?.data?.content
-      if (typeof html !== "string") return null
+      if (typeof html !== "string" || !html.trim()) throw new Error("no html in response")
       return { markdown: "", html: html.trim() }
     }
 
     const content = json?.data?.content
-    if (typeof content !== "string") return null
+    if (typeof content !== "string" || !content.trim()) throw new Error("no content in response")
     const title = json?.data?.title
     return {
       markdown: content.trim(),

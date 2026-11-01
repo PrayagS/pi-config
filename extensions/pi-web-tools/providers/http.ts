@@ -93,12 +93,3 @@ export async function postJsonOrThrow<T>({
   if (!res.ok) throw new HttpError(res.status, await errorBody(res))
   return (await res.json()) as T
 }
-
-/** Like postJsonOrThrow, but returns null on any failure. */
-export async function postJson<T>(options: PostJsonOptions): Promise<T | null> {
-  try {
-    return await postJsonOrThrow<T>(options)
-  } catch {
-    return null
-  }
-}

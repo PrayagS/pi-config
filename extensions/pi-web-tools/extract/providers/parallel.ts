@@ -1,6 +1,6 @@
-import { extractParallel } from "../../providers/parallel"
+import { extractParallel, parallelError } from "../../providers/parallel"
 import type { WebExtractItem, WebExtractProviderParams } from "./types"
-import { emptyScatter, hasAny, matchResults, selectPending, urlSet } from "./utils"
+import { emptyScatter, hasAny, matchResults, scatterErrors, selectPending, urlSet } from "./utils"
 
 function failedUrls(json: any): Set<string> {
   return urlSet(Array.isArray(json?.errors) ? json.errors.map((error: any) => error?.url) : [])
@@ -48,5 +48,13 @@ export async function extractParallelTargeted({
     }
   }
 
+  scatterErrors(
+    output,
+    selected,
+    (Array.isArray(json?.errors) ? json.errors : []).map((error: any) => ({
+      url: error?.url,
+      message: parallelError(error),
+    }))
+  )
   return hasAny(output) ? output : null
 }

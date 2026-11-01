@@ -17,12 +17,12 @@ export const firecrawl: Extractor = {
 
     if (options?.rawHtml) {
       const html = data?.rawHtml
-      if (typeof html !== "string") return null
+      if (typeof html !== "string" || !html.trim()) throw new Error("no rawHtml in response")
       return { markdown: "", html: html.trim(), metadata }
     }
 
     const markdown = data?.markdown
-    if (typeof markdown !== "string") return null
+    if (typeof markdown !== "string" || !markdown.trim()) throw new Error("no markdown in response")
     return { markdown: markdown.trim(), metadata }
   },
 }

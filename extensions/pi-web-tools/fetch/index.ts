@@ -66,6 +66,7 @@ export const webFetchTool = {
         {
           title: result.title,
           stage: result.stage,
+          ...(result.providerErrors ? { providerErrors: result.providerErrors } : {}),
         },
         rawHtml ? "html" : "md"
       )

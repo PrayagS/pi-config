@@ -1,0 +1,107 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { fetchAndExtract } from "./pipeline"
+
+const KEYS = [
+  "WEB_TOOLS_JINA_API_KEY",
+  "WEB_TOOLS_FIRECRAWL_API_KEY",
+  "WEB_TOOLS_PARALLEL_API_KEY",
+  "WEB_TOOLS_EXA_API_KEY",
+  "WEB_TOOLS_TAVILY_API_KEY",
+  "WEB_TOOLS_YOU_API_KEY",
+]
+const TARGET = "https://target.dev/page"
+
+const realFetch = globalThis.fetch
+const savedEnv: Record<string, string | undefined> = {}
+let requests: Array<{ url: string; init: RequestInit }>
+let respond: (url: string, init: RequestInit) => Response
+
+function json(value: unknown, status = 200) {
+  return new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } })
+}
+
+function html(body: string, status = 200) {
+  return new Response(`<html><head><title>T</title></head><body><article>${body}</article></body></html>`, {
+    status,
+    headers: { "Content-Type": "text/html" },
+  })
+}
+
+beforeEach(() => {
+  for (const key of [...KEYS, "WEB_TOOLS_FETCH_STAGE"]) {
+    savedEnv[key] = process.env[key]
+    delete process.env[key]
+  }
+  requests = []
+  respond = () => new Response("not found", { status: 404 })
+  globalThis.fetch = (async (url: string, init: RequestInit = {}) => {
+    requests.push({ url: String(url), init })
+    return respond(String(url), init)
+  }) as typeof fetch
+})
+
+afterEach(() => {
+  globalThis.fetch = realFetch
+  for (const [key, value] of Object.entries(savedEnv)) {
+    if (value === undefined) delete process.env[key]
+    else process.env[key] = value
+  }
+})
+
+describe("fetch provider errors", () => {
+  test("records why each provider failed when a later stage succeeds", async () => {
+    process.env.WEB_TOOLS_JINA_API_KEY = "k"
+    process.env.WEB_TOOLS_EXA_API_KEY = "k"
+    respond = (url) => {
+      if (url === "https://r.jina.ai/") return json({ code: 422, message: "bad url" }, 422)
+      if (url === "https://api.exa.ai/contents") {
+        return json({
+          results: [],
+          statuses: [{ id: TARGET, status: "error", error: { tag: "CRAWL_NOT_FOUND", httpStatusCode: 404 } }],
+        })
+      }
+      if (url.startsWith("https://markdown.new/")) return new Response("", { status: 429 })
+      return html("<h1>Hello</h1><p>Body text that is long enough to be kept by the extractor.</p>")
+    }
+    const result = await fetchAndExtract(TARGET)
+    expect(result.stage).toBe("defuddle")
+    expect(result.providerErrors).toEqual([
+      'jina-ai: HTTP 422: {"code":422,"message":"bad url"}',
+      "exa: CRAWL_NOT_FOUND (HTTP 404)",
+      "markdown-new: HTTP 429",
+    ])
+  })
+
+  test("includes provider errors when every stage fails", async () => {
+    process.env.WEB_TOOLS_TAVILY_API_KEY = "k"
+    respond = (url) => {
+      if (url === "https://api.tavily.com/extract") {
+        return json({ results: [], failed_results: [{ url: TARGET, error: "Failed to retrieve content" }] })
+      }
+      return new Response("gone", { status: 410, statusText: "Gone" })
+    }
+    await expect(fetchAndExtract(TARGET)).rejects.toThrow(
+      "HTTP 410: Gone. Providers tried: tavily: Failed to retrieve content; markdown-new: HTTP 410"
+    )
+  })
+
+  test("unconfigured providers are skipped without an error entry", async () => {
+    respond = (url) =>
+      url.startsWith("https://markdown.new/")
+        ? new Response("# From markdown.new\n\ntext", { status: 200 })
+        : new Response("", { status: 404 })
+    const result = await fetchAndExtract(TARGET)
+    expect(result.stage).toBe("markdown-new")
+    expect(result.providerErrors).toBeUndefined()
+  })
+
+  test("a forced stage reports the provider's reason", async () => {
+    process.env.WEB_TOOLS_FETCH_STAGE = "parallel"
+    process.env.WEB_TOOLS_PARALLEL_API_KEY = "k"
+    respond = () =>
+      json({ results: [], errors: [{ url: TARGET, error_type: "fetch_error", http_status_code: 403 }] })
+    await expect(fetchAndExtract(TARGET)).rejects.toThrow(
+      'Extractor "parallel" failed: fetch_error (HTTP 403)'
+    )
+  })
+})

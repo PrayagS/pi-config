@@ -1,10 +1,10 @@
-import { getExaContents } from "../../providers/exa"
+import { exaStatusError, getExaContents } from "../../providers/exa"
 import type { WebExtractItem, WebExtractProviderParams } from "./types"
-import { emptyScatter, hasAny, matchResults, selectPending, urlSet } from "./utils"
+import { emptyScatter, hasAny, matchResults, scatterErrors, selectPending, urlSet } from "./utils"
 
-function failedUrls(json: any): Set<string> {
+function failedStatuses(json: any): any[] {
   const statuses = Array.isArray(json?.statuses) ? json.statuses : []
-  return urlSet(statuses.filter((s: any) => s?.status !== "success").map((s: any) => s?.id))
+  return statuses.filter((s: any) => s?.status !== "success")
 }
 
 export async function extractExa({
@@ -29,7 +29,7 @@ export async function extractExa({
     selected,
     json?.results,
     (result) => [result?.id, result?.url],
-    failedUrls(json)
+    urlSet(failedStatuses(json).map((s) => s?.id))
   )
   for (const { url, index } of selected) {
     const result = matched.get(index)
@@ -44,5 +44,10 @@ export async function extractExa({
     }
   }
 
+  scatterErrors(
+    output,
+    selected,
+    failedStatuses(json).map((s) => ({ url: s?.id, message: exaStatusError(s) }))
+  )
   return hasAny(output) ? output : null
 }

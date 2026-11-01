@@ -17,6 +17,26 @@ export function hasAny<T>(items: Array<T | null>): boolean {
   return items.some(Boolean)
 }
 
+/**
+ * Record provider-reported per-URL failures as error items (no `source`), so the
+ * pipeline can report why a URL failed. URLs that already have content are kept.
+ */
+export function scatterErrors<T extends { url: string; error?: string }>(
+  output: Array<T | { url: string; error: string } | null>,
+  selected: SelectedUrl[],
+  failures: Array<{ url: unknown; message: string }>
+) {
+  const byUrl = new Map<string, string>()
+  for (const { url, message } of failures) {
+    if (typeof url === "string") byUrl.set(normalizeUrl(url), message)
+  }
+  for (const { url, index } of selected) {
+    if (output[index]) continue
+    const message = byUrl.get(normalizeUrl(url))
+    if (message) output[index] = { url, error: message }
+  }
+}
+
 /** Comparable form of a URL: no fragment, no trailing slash. */
 export function normalizeUrl(url: string): string {
   try {

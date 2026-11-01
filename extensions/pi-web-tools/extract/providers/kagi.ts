@@ -17,6 +17,15 @@ function extractMarkdown(response: KagiResponse): string | null {
   return typeof content === "string" && content.trim() ? content.trim() : null
 }
 
+function errorText(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function cliError(stderr: string, code: number) {
+  const message = stderr.replace(/\s+/g, " ").trim().slice(0, 300)
+  return message ? `kagi exited ${code}: ${message}` : `kagi exited ${code}`
+}
+
 export function createKagiSummaryExtractor(pi: ExtensionAPI) {
   return async function extractKagiSummary({
     urls,
@@ -50,17 +59,26 @@ export function createKagiSummaryExtractor(pi: ExtensionAPI) {
 
     const output = emptyScatter<WebExtractItem>(urls)
     for (const [selectedIndex, result] of settled.entries()) {
-      if (result.status === "rejected") continue
+      const { url, index } = selected[selectedIndex]
+      if (result.status === "rejected") {
+        output[index] = { url, error: errorText(result.reason) }
+        continue
+      }
 
-      const { stdout, code } = result.value
-      if (code !== 0) continue
+      const { stdout, stderr, code } = result.value
+      if (code !== 0) {
+        output[index] = { url, error: cliError(stderr, code) }
+        continue
+      }
 
       try {
         const response = JSON.parse(stdout) as KagiResponse
         const markdown = extractMarkdown(response)
-        if (!markdown) continue
+        if (!markdown) {
+          output[index] = { url, error: "empty summary" }
+          continue
+        }
 
-        const { url, index } = selected[selectedIndex]
         const title = response.data?.title
         output[index] = {
           url,
@@ -70,7 +88,7 @@ export function createKagiSummaryExtractor(pi: ExtensionAPI) {
           metadata: response.data,
         }
       } catch {
-        continue
+        output[index] = { url, error: "invalid JSON from kagi CLI" }
       }
     }
 

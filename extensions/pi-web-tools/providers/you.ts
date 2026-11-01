@@ -1,4 +1,5 @@
-import { postJson } from "./http"
+// Throws on HTTP/network errors; returns null only when the API key is unset.
+import { postJsonOrThrow as postJson } from "./http"
 
 export interface YouContentsParams {
   urls: string[]

@@ -19,6 +19,8 @@ export interface FetchResult {
   url: string
   stage: ExtractionStage
   metadata?: Record<string, unknown>
+  /** "provider: reason" for each extractor that failed before `stage` succeeded. */
+  providerErrors?: string[]
 }
 
 function extractTitle(md: string, fallback: string): string {

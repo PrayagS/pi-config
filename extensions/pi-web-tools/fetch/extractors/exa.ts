@@ -1,4 +1,4 @@
-import { getExaContents } from "../../providers/exa"
+import { exaStatusError, getExaContents } from "../../providers/exa"
 import type { Extractor } from "./types"
 
 export const exa: Extractor = {
@@ -10,18 +10,15 @@ export const exa: Extractor = {
     )
     if (!json) return null
 
-    // Treat any non-success status as failure
-    const statuses = json?.statuses
-    if (Array.isArray(statuses)) {
-      const ourStatus = statuses.find(
-        (s: any) => s?.id === url || s?.id === decodeURIComponent(url)
-      )
-      if (!ourStatus || ourStatus.status !== "success") return null
-    }
+    // One URL per request, so any non-success status is ours.
+    const failed = Array.isArray(json?.statuses)
+      ? json.statuses.find((s: any) => s?.status !== "success")
+      : undefined
+    if (failed) throw new Error(exaStatusError(failed))
 
     const result = json?.results?.[0]
     const text = result?.text
-    if (typeof text !== "string") return null
+    if (typeof text !== "string" || !text.trim()) throw new Error("no text in response")
     return {
       markdown: text.trim(),
       title: result?.title,

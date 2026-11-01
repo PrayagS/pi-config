@@ -15,7 +15,7 @@ export const you: Extractor = {
 
     if (options?.rawHtml) {
       const html = item?.html
-      if (typeof html !== "string") return null
+      if (typeof html !== "string" || !html.trim()) throw new Error("no html in response")
       return {
         markdown: "",
         html: html.trim(),
@@ -25,7 +25,7 @@ export const you: Extractor = {
     }
 
     const markdown = item?.markdown
-    if (typeof markdown !== "string") return null
+    if (typeof markdown !== "string" || !markdown.trim()) throw new Error("no markdown in response")
     return {
       markdown: markdown.trim(),
       title: item?.title,

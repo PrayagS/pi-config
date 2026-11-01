@@ -126,3 +126,29 @@ describe("result matching", () => {
     expect(contentOf(out)).toEqual([null, null, "C"])
   })
 })
+
+describe("per-URL provider errors", () => {
+  test("explains why a URL failed across providers", async () => {
+    const { runWebExtract } = await import("../pipeline")
+    delete process.env.WEB_TOOLS_PARALLEL_API_KEY
+    respond = (url) => {
+      if (url === "https://api.exa.ai/contents") {
+        return json({
+          results: [{ id: A, url: A, summary: "A answer" }],
+          statuses: [
+            { id: A, status: "success" },
+            { id: B, status: "error", error: { tag: "CRAWL_HTTP_403", httpStatusCode: 403 } },
+          ],
+        })
+      }
+      return json({ detail: { error: "All URLs failed validation." } }, 400)
+    }
+    const out = await runWebExtract({} as any, { urls: [A, B], mode: "targeted", prompt: "p" })
+    expect(out.results[0]).toMatchObject({ url: A, source: "exa", content: "A answer" })
+    expect(out.results[1].error).toBe(
+      'No provider returned content for this URL (exa: CRAWL_HTTP_403 (HTTP 403); tavily: HTTP 400: {"detail":{"error":"All URLs failed validation."}})'
+    )
+    expect(requests.map((r) => r.url)).toEqual(["https://api.exa.ai/contents", "https://api.tavily.com/extract"])
+    expect(requests[1].body.urls).toEqual([B])
+  })
+})
