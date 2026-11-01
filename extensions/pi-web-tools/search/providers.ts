@@ -49,6 +49,12 @@ function normalizeDate(value: unknown) {
   return text(value)
 }
 
+function strings(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const found = value.filter((s): s is string => typeof s === "string" && s.trim() !== "")
+  return found.length > 0 ? found : undefined
+}
+
 function capContent(value: string | undefined) {
   if (!value || value.length <= CONTENT_MAX_CHARS) return value
   return `${value.slice(0, CONTENT_MAX_CHARS)}\n\n[\u2026truncated; use web_fetch for the full page]`
@@ -65,13 +71,11 @@ function warningMessages(value: unknown): string[] | undefined {
 function normalizeResult(item: any, source: string): WebSearchResult | null {
   const url = firstText(item?.url, item?.link, item?.sourceUrl, item?.sourceURL)
   if (!url) return null
-  const snippets = Array.isArray(item?.snippets)
-    ? item.snippets.filter((s: unknown) => typeof s === "string")
-    : Array.isArray(item?.highlights)
-      ? item.highlights.filter((s: unknown) => typeof s === "string")
-      : Array.isArray(item?.excerpts)
-        ? item.excerpts.filter((s: unknown) => typeof s === "string")
-        : undefined
+  const snippets =
+    strings(item?.snippets) ??
+    strings(item?.highlights) ??
+    strings(item?.contents?.highlights) ??
+    strings(item?.excerpts)
   const snippet = firstText(
     item?.markdown,
     item?.raw_content,
@@ -81,7 +85,7 @@ function normalizeResult(item: any, source: string): WebSearchResult | null {
     item?.content,
     item?.text,
     item?.summary,
-    snippets?.join("\n")
+    snippets?.join("\n\n")
   )
   return {
     title: firstText(item?.title, item?.name) ?? url,
@@ -303,14 +307,24 @@ export const searchYou: WebSearchProvider = async ({
       freshness: age,
       include_domains: includeDomains,
       exclude_domains: excludeDomains,
-      livecrawl: includeContent ? "all" : undefined,
-      livecrawl_formats: includeContent ? ["markdown"] : undefined,
+      // `extraction` supersedes the deprecated livecrawl/livecrawl_formats fields.
+      ...(includeContent
+        ? {
+            extraction: {
+              extraction_mode: "full_page",
+              full_page: { extraction_formats: ["markdown"] },
+            },
+            // Default is 10s; leave room inside our 15s budget.
+            crawl_timeout: 8,
+          }
+        : {}),
     },
     signal,
     timeout: TIMEOUT_MS,
   })
   if (!json) return null
-  const items = [...(json.results?.web ?? []), ...(json.results?.news ?? [])]
+  // News results are returned inside results.web; results.news no longer exists.
+  const items = json.results?.web ?? []
   return {
     source: "you",
     results: compact(
@@ -318,14 +332,13 @@ export const searchYou: WebSearchProvider = async ({
         normalizeResult(
           {
             ...i,
-            snippet: Array.isArray(i?.snippets)
-              ? i.snippets.filter((s: unknown) => typeof s === "string").join("\n")
-              : i?.snippet,
+            // Prefer query-relevant snippets/highlights over the generic description.
+            snippet: (strings(i?.snippets) ?? strings(i?.contents?.highlights))?.join("\n\n"),
           },
           "you"
         )
       ),
       limit
-    )
+    ),
   }
 }

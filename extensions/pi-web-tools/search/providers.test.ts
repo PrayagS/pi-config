@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { CONTENT_MAX_CHARS, searchExa, searchParallel, searchTavily } from "./providers"
+import { CONTENT_MAX_CHARS, searchExa, searchParallel, searchTavily, searchYou } from "./providers"
 
 const KEYS = [
   "WEB_TOOLS_EXA_API_KEY",
@@ -74,7 +74,7 @@ describe("parallel", () => {
       })
     const out = await searchParallel({ query: "q", limit: 5 })
     expect(out?.warnings).toEqual(["max_results capped at 20"])
-    expect(out?.results[0].snippet).toBe("one\ntwo")
+    expect(out?.results[0].snippet).toBe("one\n\ntwo")
   })
 })
 
@@ -111,5 +111,39 @@ describe("tavily", () => {
     expect(out?.results[0].published).toBe("2026-10-01")
     expect(out?.results[0].snippet?.startsWith("x".repeat(CONTENT_MAX_CHARS))).toBe(true)
     expect(out?.results[0].snippet).toContain("truncated; use web_fetch")
+  })
+})
+
+describe("you.com", () => {
+  test("uses extraction instead of deprecated livecrawl fields", async () => {
+    await searchYou({ query: "q", limit: 10, includeContent: true })
+    const { body } = requests[0]
+    expect(body.livecrawl).toBeUndefined()
+    expect(body.livecrawl_formats).toBeUndefined()
+    expect(body.extraction).toEqual({
+      extraction_mode: "full_page",
+      full_page: { extraction_formats: ["markdown"] },
+    })
+    expect(body.crawl_timeout).toBe(8)
+  })
+
+  test("sends no extraction for the default path", async () => {
+    await searchYou({ query: "q", limit: 10 })
+    expect(requests[0].body.extraction).toBeUndefined()
+    expect(requests[0].body.crawl_timeout).toBeUndefined()
+  })
+
+  test("reads snippets and contents.highlights ahead of description", async () => {
+    respond = () =>
+      json({
+        results: {
+          web: [
+            { url: "https://a.dev", title: "A", description: "desc", snippets: ["s1", "s2"] },
+            { url: "https://b.dev", title: "B", description: "desc", contents: { highlights: ["h1"] } },
+          ],
+        },
+      })
+    const out = await searchYou({ query: "q", limit: 10 })
+    expect(out?.results.map((r) => r.snippet)).toEqual(["s1\n\ns2", "h1"])
   })
 })
