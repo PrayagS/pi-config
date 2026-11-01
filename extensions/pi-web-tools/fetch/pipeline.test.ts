@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { runWebExtract } from "../extract/pipeline"
 import { searchParallel } from "../search/providers"
-import { fetchAndExtract } from "./pipeline"
+import { fetchAndExtract, fetchRawHtml } from "./pipeline"
 
 const KEYS = [
   "WEB_TOOLS_JINA_API_KEY",
@@ -140,6 +140,18 @@ describe("target error pages", () => {
     await fetchAndExtract(TARGET)
     const headers = requests[0].init.headers as Record<string, string>
     expect(headers["X-Assert-Status-Code"]).toBe("200")
+  })
+
+  test("jina: drops images from markdown but not from raw HTML", async () => {
+    process.env.WEB_TOOLS_FETCH_STAGE = "jina-ai"
+    process.env.WEB_TOOLS_JINA_API_KEY = "k"
+    respond = () => json({ data: { content: "Hello", html: "<p>Hello</p>" } })
+    await fetchAndExtract(TARGET)
+    await fetchRawHtml(TARGET)
+    const [markdown, raw] = requests.map((r) => r.init.headers as Record<string, string>)
+    expect(markdown["X-Retain-Images"]).toBe("none")
+    expect(raw["X-Retain-Images"]).toBeUndefined()
+    expect(raw["X-Respond-With"]).toBe("html")
   })
 })
 

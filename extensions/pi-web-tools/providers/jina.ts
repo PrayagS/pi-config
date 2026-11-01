@@ -22,6 +22,8 @@ export async function fetchJinaReader(
         "X-Assert-Status-Code": "200",
       }
       if (params.rawHtml) headers["X-Respond-With"] = "html"
+      // Drop image markdown from text output to save tokens; raw HTML is returned as-is.
+      else headers["X-Retain-Images"] = "none"
       return headers
     },
     body: { url: params.url },
