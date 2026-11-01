@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { buildKagiSearchArgs } from "../providers/kagi"
+import { ageCutoffDate } from "./age"
 import { CONTENT_MAX_CHARS, searchExa, searchParallel, searchTavily, searchYou } from "./providers"
 
 const KEYS = [
@@ -145,5 +147,22 @@ describe("you.com", () => {
       })
     const out = await searchYou({ query: "q", limit: 10 })
     expect(out?.results.map((r) => r.snippet)).toEqual(["s1\n\ns2", "h1"])
+  })
+})
+
+describe("kagi", () => {
+  test("passes --limit and uses --from-date instead of session-only --time", () => {
+    const args = buildKagiSearchArgs("rust", { age: "month", includeDomains: ["docs.rs"] }, 7)
+    expect(args).not.toContain("--time")
+    expect(args).toEqual([
+      "search",
+      "--format",
+      "compact",
+      "--limit",
+      "7",
+      "--from-date",
+      ageCutoffDate("month")!,
+      "site:docs.rs rust",
+    ])
   })
 })

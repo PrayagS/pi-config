@@ -109,7 +109,7 @@ function compact(results: Array<WebSearchResult | null>, limit: number) {
 
 export function createKagiSearchProvider(pi: ExtensionAPI): WebSearchProvider {
   return async ({ query, limit, signal, sessionKey: _sessionKey, ...filters }) => {
-    const { stdout, stderr, code } = await pi.exec("kagi", buildKagiSearchArgs(query, filters), {
+    const { stdout, stderr, code } = await pi.exec("kagi", buildKagiSearchArgs(query, filters, limit), {
       signal,
       timeout: TIMEOUT_MS,
     })
