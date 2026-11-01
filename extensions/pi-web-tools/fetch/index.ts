@@ -21,7 +21,13 @@ export const webFetchTool = {
     ),
   }),
 
-  async execute(_toolCallId: string, params: any, signal?: AbortSignal) {
+  async execute(
+    _toolCallId: string,
+    params: any,
+    signal?: AbortSignal,
+    _onUpdate?: unknown,
+    ctx?: { sessionManager?: { getSessionId?: () => string } }
+  ) {
     try {
       const url = validateFetchUrl(params.url)
 
@@ -42,9 +48,10 @@ export const webFetchTool = {
 
       // Normal fetch pipeline
       const rawHtml = params.rawHtml === true
+      const sessionKey = ctx?.sessionManager?.getSessionId?.()
       const result = rawHtml
-        ? await fetchRawHtml(url, signal)
-        : await fetchAndExtract(url, signal)
+        ? await fetchRawHtml(url, signal, sessionKey)
+        : await fetchAndExtract(url, signal, sessionKey)
 
       let fullText: string
       if (rawHtml) {

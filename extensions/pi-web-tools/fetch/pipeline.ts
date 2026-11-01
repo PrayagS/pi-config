@@ -20,12 +20,13 @@ async function firstExtracted(
   extractors: Extractor[],
   rawHtml: boolean,
   errors: string[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionKey?: string
 ): Promise<FetchResult | null> {
   for (const extractor of extractors) {
     if (signal?.aborted) throw new Error("cancelled")
     try {
-      const result = await extractor.extract(url, signal, rawHtml ? { rawHtml } : undefined)
+      const result = await extractor.extract(url, signal, { rawHtml, sessionKey })
       if (result) return buildResult(url, result, extractor.name, rawHtml)
     } catch (error) {
       if (signal?.aborted) throw error
@@ -54,7 +55,8 @@ async function finalFallback(
 async function runEnvStage(
   url: string,
   rawHtml: boolean,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionKey?: string
 ): Promise<FetchResult | null> {
   const envStage = process.env.WEB_TOOLS_FETCH_STAGE
   if (!envStage) return null
@@ -72,7 +74,7 @@ async function runEnvStage(
   if (extractor) {
     let extracted: Awaited<ReturnType<Extractor["extract"]>>
     try {
-      extracted = await extractor.extract(url, signal, { rawHtml })
+      extracted = await extractor.extract(url, signal, { rawHtml, sessionKey })
     } catch (error) {
       throw new Error(`Extractor "${envStage}" failed: ${errorMessage(error)}`)
     }
@@ -95,13 +97,14 @@ async function runEnvStage(
 
 export async function fetchRawHtml(
   url: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionKey?: string
 ): Promise<FetchResult> {
-  const envResult = await runEnvStage(url, true, signal)
+  const envResult = await runEnvStage(url, true, signal, sessionKey)
   if (envResult) return envResult
 
   const errors: string[] = []
-  const result = await firstExtracted(url, [jina, firecrawl, you], true, errors, signal)
+  const result = await firstExtracted(url, [jina, firecrawl, you], true, errors, signal, sessionKey)
   if (result) return errors.length > 0 ? { ...result, providerErrors: errors } : result
 
   return finalFallback(url, false, errors, signal)
@@ -109,16 +112,17 @@ export async function fetchRawHtml(
 
 export async function fetchAndExtract(
   url: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionKey?: string
 ): Promise<FetchResult> {
-  const envResult = await runEnvStage(url, false, signal)
+  const envResult = await runEnvStage(url, false, signal, sessionKey)
   if (envResult) return envResult
 
   const markdownResult = await fetchMarkdownViaContentNegotiation(url, signal)
   if (markdownResult) return markdownResult
 
   const errors: string[] = []
-  const result = await firstExtracted(url, apiExtractors, false, errors, signal)
+  const result = await firstExtracted(url, apiExtractors, false, errors, signal, sessionKey)
   if (result) return errors.length > 0 ? { ...result, providerErrors: errors } : result
 
   return finalFallback(url, true, errors, signal)

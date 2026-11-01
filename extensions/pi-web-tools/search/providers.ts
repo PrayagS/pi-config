@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
 import { postJsonOrThrow as postJson } from "../providers/http"
 import { buildKagiSearchArgs } from "../providers/kagi"
+import { parallelSessionId, rememberParallelSession } from "../providers/parallel"
 import { ageCutoff, ageCutoffDate } from "./age"
 import type { SearchFilters, WebSearchResult } from "./types"
 
@@ -214,8 +215,6 @@ export const searchTavily: WebSearchProvider = async ({
   return { source: "tavily", results: compact((json.results ?? []).map((i: any) => normalizeResult(i, "tavily")), limit) }
 }
 
-/** Parallel session ids keyed by pi session, so each pi task gets its own Parallel session. */
-const parallelSessionIds = new Map<string, string>()
 const PARALLEL_MAX_RESULTS = 20
 
 export const searchParallel: WebSearchProvider = async ({
@@ -245,8 +244,8 @@ export const searchParallel: WebSearchProvider = async ({
   if (includeDomains?.length) sourcePolicy.include_domains = includeDomains
   if (excludeDomains?.length) sourcePolicy.exclude_domains = excludeDomains
   if (Object.keys(sourcePolicy).length > 0) body.advanced_settings.source_policy = sourcePolicy
-  const parallelSessionId = sessionKey ? parallelSessionIds.get(sessionKey) : undefined
-  if (parallelSessionId) body.session_id = parallelSessionId
+  const sessionId = parallelSessionId(sessionKey)
+  if (sessionId) body.session_id = sessionId
   const json = await postJson<any>({
     url: "https://api.parallel.ai/v1/search",
     apiKeyEnv: "WEB_TOOLS_PARALLEL_API_KEY",
@@ -256,9 +255,7 @@ export const searchParallel: WebSearchProvider = async ({
     timeout: TIMEOUT_MS,
   })
   if (!json) return null
-  if (sessionKey && typeof json.session_id === "string") {
-    parallelSessionIds.set(sessionKey, json.session_id)
-  }
+  rememberParallelSession(sessionKey, json.session_id)
   return {
     source: "parallel",
     results: compact((json.results ?? []).map((i: any) => normalizeResult(i, "parallel")), limit),

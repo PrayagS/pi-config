@@ -1,7 +1,21 @@
 // Throws on HTTP/network errors; returns null only when the API key is unset.
 import { postJsonOrThrow as postJson } from "./http"
 
-let sessionId: string | undefined
+/**
+ * Parallel session ids keyed by pi session id. Parallel groups search and
+ * extract calls that belong to "the same larger task" by session_id, so search
+ * and extract share one session per pi session. Calls without a pi session id
+ * send no session_id.
+ */
+const sessionIds = new Map<string, string>()
+
+export function parallelSessionId(sessionKey?: string): string | undefined {
+  return sessionKey ? sessionIds.get(sessionKey) : undefined
+}
+
+export function rememberParallelSession(sessionKey: string | undefined, sessionId: unknown) {
+  if (sessionKey && typeof sessionId === "string") sessionIds.set(sessionKey, sessionId)
+}
 
 export interface ParallelExtractParams {
   urls: string[]
@@ -19,9 +33,11 @@ export function parallelError(error: any): string {
 
 export async function extractParallel(
   params: ParallelExtractParams,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionKey?: string
 ): Promise<any | null> {
   const body: Record<string, unknown> = { ...params }
+  const sessionId = parallelSessionId(sessionKey)
   if (sessionId) body.session_id = sessionId
 
   const json = await postJson<any>({
@@ -34,6 +50,6 @@ export async function extractParallel(
     body,
     signal,
   })
-  if (json?.session_id) sessionId = json.session_id
+  rememberParallelSession(sessionKey, json?.session_id)
   return json
 }

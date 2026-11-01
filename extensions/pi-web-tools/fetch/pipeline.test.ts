@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { runWebExtract } from "../extract/pipeline"
+import { searchParallel } from "../search/providers"
 import { fetchAndExtract } from "./pipeline"
 
 const KEYS = [
@@ -138,5 +140,35 @@ describe("exa contents request", () => {
     await fetchAndExtract(TARGET)
     const body = JSON.parse(String(requests[0].init.body))
     expect(body).toEqual({ urls: [TARGET], text: { verbosity: "full" } })
+  })
+})
+
+describe("parallel sessions", () => {
+  test("search, fetch and extract share one Parallel session per pi session", async () => {
+    process.env.WEB_TOOLS_PARALLEL_API_KEY = "k"
+    respond = (url, init) => {
+      const body = JSON.parse(String(init.body))
+      const session = body.session_id ?? `S-${requests.length}`
+      if (url === "https://api.parallel.ai/v1/search") return json({ results: [], session_id: session })
+      return json({ results: [{ url: TARGET, full_content: "full", excerpts: ["e"] }], session_id: session })
+    }
+    await searchParallel({ query: "q", limit: 3, sessionKey: "pi-x" })
+    process.env.WEB_TOOLS_FETCH_STAGE = "parallel"
+    await fetchAndExtract(TARGET, undefined, "pi-x")
+    await runWebExtract({} as any, { urls: [TARGET], mode: "targeted", prompt: "p", sessionKey: "pi-x" })
+    await fetchAndExtract(TARGET, undefined, "pi-y")
+    await fetchAndExtract(TARGET)
+    const sessions = requests.map((r) => JSON.parse(String(r.init.body)).session_id)
+    expect(sessions).toEqual([undefined, "S-1", "S-1", undefined, undefined])
+  })
+
+  test("fetch labels excerpts when Parallel has no full content", async () => {
+    process.env.WEB_TOOLS_FETCH_STAGE = "parallel"
+    process.env.WEB_TOOLS_PARALLEL_API_KEY = "k"
+    respond = () => json({ results: [{ url: TARGET, excerpts: ["one", "two"] }] })
+    const result = await fetchAndExtract(TARGET)
+    expect(result.content).toBe(
+      "> Parallel returned excerpts only; the full page content was unavailable.\n\none\n\ntwo"
+    )
   })
 })

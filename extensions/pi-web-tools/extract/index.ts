@@ -42,7 +42,13 @@ export function createWebExtractTool(pi: ExtensionAPI) {
     parameters,
     renderCall,
     renderResult,
-    async execute(_toolCallId: string, params: any, signal?: AbortSignal) {
+    async execute(
+      _toolCallId: string,
+      params: any,
+      signal?: AbortSignal,
+      _onUpdate?: unknown,
+      ctx?: { sessionManager?: { getSessionId?: () => string } }
+    ) {
       try {
         const urls = Array.isArray(params.urls)
           ? params.urls.map((url: unknown) => String(url).trim()).filter(Boolean)
@@ -60,7 +66,11 @@ export function createWebExtractTool(pi: ExtensionAPI) {
           throw new Error("prompt is required for targeted mode")
         }
 
-        const output = await runWebExtract(pi, { urls, mode, prompt }, signal)
+        const output = await runWebExtract(
+          pi,
+          { urls, mode, prompt, sessionKey: ctx?.sessionManager?.getSessionId?.() },
+          signal
+        )
         const successCount = output.results.filter((result) => result.source).length
         if (successCount === 0) {
           throw new Error("No provider returned content for any URL")

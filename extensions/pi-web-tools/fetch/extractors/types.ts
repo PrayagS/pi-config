@@ -9,6 +9,8 @@ export interface ExtractResult {
 
 export interface ExtractorOptions {
   rawHtml?: boolean
+  /** Stable id of the calling pi session, for providers with task sessions. */
+  sessionKey?: string
 }
 
 export interface Extractor {

@@ -7,6 +7,8 @@ export interface WebExtractProviderParams {
   prompt?: string
   pending?: boolean[]
   signal?: AbortSignal
+  /** Stable id of the calling pi session, for providers with task sessions. */
+  sessionKey?: string
 }
 
 export interface WebExtractItem {

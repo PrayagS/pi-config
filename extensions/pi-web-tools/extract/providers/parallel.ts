@@ -12,6 +12,7 @@ export async function extractParallelTargeted({
   prompt,
   pending,
   signal,
+  sessionKey,
 }: WebExtractProviderParams): Promise<Array<WebExtractItem | null> | null> {
   if (mode !== "targeted") return null
 
@@ -20,7 +21,8 @@ export async function extractParallelTargeted({
 
   const json = await extractParallel(
     { urls: selected.map(({ url }) => url), objective: prompt },
-    signal
+    signal,
+    sessionKey
   )
   if (!json) return null
 
