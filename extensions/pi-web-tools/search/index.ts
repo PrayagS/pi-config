@@ -61,12 +61,18 @@ export function createWebSearchTool(pi: ExtensionAPI) {
       includeContent: Type.Optional(
         Type.Boolean({
           description:
-            "When true, request provider-supported page content from search results. Uses Firecrawl markdown, Tavily markdown, Parallel excerpts, Exa summaries, and You.com markdown; unsupported providers are skipped.",
+            "When true, request provider-supported page content from search results. Uses Firecrawl markdown, Tavily markdown, Parallel long excerpts, Exa summaries, and You.com markdown; unsupported providers are skipped.",
         })
       ),
     }),
 
-    async execute(_toolCallId: string, params: any, signal?: AbortSignal) {
+    async execute(
+      _toolCallId: string,
+      params: any,
+      signal?: AbortSignal,
+      _onUpdate?: unknown,
+      ctx?: { sessionManager?: { getSessionId?: () => string } }
+    ) {
       const {
         queries,
         limit = 10,
@@ -105,7 +111,8 @@ export function createWebSearchTool(pi: ExtensionAPI) {
             includeDomains,
             excludeDomains,
             includeContent,
-              },
+            sessionKey: ctx?.sessionManager?.getSessionId?.(),
+          },
           signal
         )
       } catch (e: any) {

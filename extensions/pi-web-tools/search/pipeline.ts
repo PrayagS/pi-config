@@ -13,6 +13,7 @@ import {
 export interface WebSearchPipelineParams extends SearchFilters {
   queries: string[]
   limit: number
+  sessionKey?: string
 }
 
 export interface WebSearchQueryOutput {

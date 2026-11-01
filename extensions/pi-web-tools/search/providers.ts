@@ -1,14 +1,19 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
 import { postJsonOrThrow as postJson } from "../providers/http"
 import { buildKagiSearchArgs } from "../providers/kagi"
-import type { SearchAge, SearchFilters, WebSearchResult } from "./types"
+import { ageCutoffDate } from "./age"
+import type { SearchFilters, WebSearchResult } from "./types"
 
 const TIMEOUT_MS = 15_000
+/** Per-result cap for includeContent page text; full pages belong to web_fetch. */
+export const CONTENT_MAX_CHARS = 8_000
 
 export interface WebSearchProviderParams extends SearchFilters {
   query: string
   limit: number
   signal?: AbortSignal
+  /** Stable id of the calling pi session, for providers with task sessions. */
+  sessionKey?: string
 }
 
 export interface WebSearchProviderOutput {
@@ -52,16 +57,6 @@ function warningMessages(value: unknown): string[] | undefined {
   return messages.length > 0 ? messages : undefined
 }
 
-function startDateForAge(age: SearchAge | undefined) {
-  if (!age) return undefined
-  const date = new Date()
-  if (age === "day") date.setDate(date.getDate() - 1)
-  if (age === "week") date.setDate(date.getDate() - 7)
-  if (age === "month") date.setMonth(date.getMonth() - 1)
-  if (age === "year") date.setFullYear(date.getFullYear() - 1)
-  return date.toISOString().slice(0, 10)
-}
-
 function normalizeResult(item: any, source: string): WebSearchResult | null {
   const url = firstText(item?.url, item?.link, item?.sourceUrl, item?.sourceURL)
   if (!url) return null
@@ -99,7 +94,7 @@ function compact(results: Array<WebSearchResult | null>, limit: number) {
 }
 
 export function createKagiSearchProvider(pi: ExtensionAPI): WebSearchProvider {
-  return async ({ query, limit, signal, ...filters }) => {
+  return async ({ query, limit, signal, sessionKey: _sessionKey, ...filters }) => {
     const { stdout, stderr, code } = await pi.exec("kagi", buildKagiSearchArgs(query, filters), {
       signal,
       timeout: TIMEOUT_MS,
@@ -185,27 +180,38 @@ export const searchTavily: WebSearchProvider = async ({
   return { source: "tavily", results: compact((json.results ?? []).map((i: any) => normalizeResult(i, "tavily")), limit) }
 }
 
-let parallelSessionId: string | undefined
+/** Parallel session ids keyed by pi session, so each pi task gets its own Parallel session. */
+const parallelSessionIds = new Map<string, string>()
+const PARALLEL_MAX_RESULTS = 20
+
 export const searchParallel: WebSearchProvider = async ({
   query,
   limit,
   age,
   includeDomains,
   excludeDomains,
-  includeContent: _includeContent,
+  includeContent,
   signal,
+  sessionKey,
 }) => {
   const body: any = {
     objective: query,
     search_queries: [query],
-    advanced_settings: { max_results: limit },
+    // Default is "advanced" (~3s); "fast" is Parallel's recommended agent mode (~1s).
+    mode: "fast",
+    advanced_settings: { max_results: Math.min(limit, PARALLEL_MAX_RESULTS) },
+  }
+  // Search only returns excerpts; ask for longer ones when page content is wanted.
+  if (includeContent) {
+    body.advanced_settings.excerpt_settings = { max_chars_per_result: CONTENT_MAX_CHARS }
   }
   const sourcePolicy: Record<string, unknown> = {}
-  const afterDate = startDateForAge(age)
+  const afterDate = ageCutoffDate(age)
   if (afterDate) sourcePolicy.after_date = afterDate
   if (includeDomains?.length) sourcePolicy.include_domains = includeDomains
   if (excludeDomains?.length) sourcePolicy.exclude_domains = excludeDomains
   if (Object.keys(sourcePolicy).length > 0) body.advanced_settings.source_policy = sourcePolicy
+  const parallelSessionId = sessionKey ? parallelSessionIds.get(sessionKey) : undefined
   if (parallelSessionId) body.session_id = parallelSessionId
   const json = await postJson<any>({
     url: "https://api.parallel.ai/v1/search",
@@ -216,7 +222,9 @@ export const searchParallel: WebSearchProvider = async ({
     timeout: TIMEOUT_MS,
   })
   if (!json) return null
-  if (json.session_id) parallelSessionId = json.session_id
+  if (sessionKey && typeof json.session_id === "string") {
+    parallelSessionIds.set(sessionKey, json.session_id)
+  }
   return {
     source: "parallel",
     results: compact((json.results ?? []).map((i: any) => normalizeResult(i, "parallel")), limit),
@@ -241,7 +249,7 @@ export const searchExa: WebSearchProvider = async ({
       query,
       type: "auto",
       numResults: limit,
-      startPublishedDate: startDateForAge(age),
+      startPublishedDate: ageCutoffDate(age),
       includeDomains,
       excludeDomains,
       contents: includeContent ? { summary: true } : { highlights: true },

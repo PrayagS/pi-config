@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { searchExa, searchParallel } from "./providers"
+import { CONTENT_MAX_CHARS, searchExa, searchParallel } from "./providers"
 
 const KEYS = [
   "WEB_TOOLS_EXA_API_KEY",
@@ -49,6 +49,23 @@ describe("error reporting", () => {
 })
 
 describe("parallel", () => {
+  test("uses fast mode, clamps max_results, and requests long excerpts for content", async () => {
+    await searchParallel({ query: "q", limit: 50, includeContent: true })
+    const { body } = requests[0]
+    expect(body.mode).toBe("fast")
+    expect(body.advanced_settings.max_results).toBe(20)
+    expect(body.advanced_settings.excerpt_settings).toEqual({ max_chars_per_result: CONTENT_MAX_CHARS })
+  })
+
+  test("scopes session_id to the pi session", async () => {
+    respond = (_url, body) => json({ results: [], session_id: `server-${body.session_id ?? "new"}` })
+    await searchParallel({ query: "q", limit: 5, sessionKey: "pi-a" })
+    await searchParallel({ query: "q", limit: 5, sessionKey: "pi-a" })
+    await searchParallel({ query: "q", limit: 5, sessionKey: "pi-b" })
+    await searchParallel({ query: "q", limit: 5 })
+    expect(requests.map((r) => r.body.session_id)).toEqual([undefined, "server-new", undefined, undefined])
+  })
+
   test("returns warnings separately from results", async () => {
     respond = () =>
       json({
