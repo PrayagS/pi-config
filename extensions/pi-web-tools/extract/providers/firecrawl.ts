@@ -1,4 +1,4 @@
-import { scrapeFirecrawl } from "../../providers/firecrawl"
+import { firecrawlPageError, scrapeFirecrawl } from "../../providers/firecrawl"
 import type { WebExtractItem, WebExtractProviderParams } from "./types"
 import { hasAny } from "./utils"
 
@@ -20,6 +20,8 @@ export async function extractFirecrawlSummary({
         return { url, error: error instanceof Error ? error.message : String(error) }
       }
       if (!json) return null
+      const pageError = firecrawlPageError(json?.data?.metadata)
+      if (pageError) return { url, error: pageError }
       const summary = json?.data?.summary
       if (typeof summary !== "string" || !summary.trim()) {
         return { url, error: "no summary in response" }

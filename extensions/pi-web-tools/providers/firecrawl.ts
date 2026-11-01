@@ -6,6 +6,19 @@ export interface FirecrawlScrapeParams {
   formats: Array<string | Record<string, unknown>>
 }
 
+/**
+ * Firecrawl returns 200 even when the target page failed; the page's own status
+ * is in data.metadata.statusCode / data.metadata.error.
+ */
+export function firecrawlPageError(metadata: any): string | undefined {
+  const status = typeof metadata?.statusCode === "number" ? metadata.statusCode : undefined
+  const error = typeof metadata?.error === "string" && metadata.error.trim() ? metadata.error.trim() : undefined
+  if (status !== undefined && status >= 400) {
+    return error ? `target page returned HTTP ${status}: ${error}` : `target page returned HTTP ${status}`
+  }
+  return error ? `target page error: ${error}` : undefined
+}
+
 export async function scrapeFirecrawl(
   params: FirecrawlScrapeParams,
   signal?: AbortSignal

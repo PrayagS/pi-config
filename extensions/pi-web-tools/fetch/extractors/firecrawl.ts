@@ -1,4 +1,4 @@
-import { scrapeFirecrawl } from "../../providers/firecrawl"
+import { firecrawlPageError, scrapeFirecrawl } from "../../providers/firecrawl"
 import type { Extractor } from "./types"
 
 export const firecrawl: Extractor = {
@@ -10,6 +10,8 @@ export const firecrawl: Extractor = {
 
     const data = json?.data
     const meta = data?.metadata
+    const pageError = firecrawlPageError(meta)
+    if (pageError) throw new Error(pageError)
     const metadata: Record<string, unknown> = {}
     if (meta?.title) metadata.title = meta.title
     if (meta?.cacheState) metadata.cacheState = meta.cacheState

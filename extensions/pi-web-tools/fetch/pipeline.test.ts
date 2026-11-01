@@ -105,3 +105,27 @@ describe("fetch provider errors", () => {
     )
   })
 })
+
+describe("target error pages", () => {
+  test("firecrawl: a 200 response wrapping a 404 page is a failure", async () => {
+    process.env.WEB_TOOLS_FETCH_STAGE = "firecrawl"
+    process.env.WEB_TOOLS_FIRECRAWL_API_KEY = "k"
+    respond = () =>
+      json({
+        success: true,
+        data: { markdown: "# Not Found", metadata: { statusCode: 404, error: "Not Found" } },
+      })
+    await expect(fetchAndExtract(TARGET)).rejects.toThrow(
+      'Extractor "firecrawl" failed: target page returned HTTP 404: Not Found'
+    )
+  })
+
+  test("jina: asks Reader to reject non-200 target pages", async () => {
+    process.env.WEB_TOOLS_FETCH_STAGE = "jina-ai"
+    process.env.WEB_TOOLS_JINA_API_KEY = "k"
+    respond = () => json({ data: { content: "Hello", title: "T" } })
+    await fetchAndExtract(TARGET)
+    const headers = requests[0].init.headers as Record<string, string>
+    expect(headers["X-Assert-Status-Code"]).toBe("200")
+  })
+})

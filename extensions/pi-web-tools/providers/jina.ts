@@ -18,6 +18,8 @@ export async function fetchJinaReader(
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         Accept: "application/json",
+        // Reject (HTTP 422) instead of returning a 4xx/5xx error page as content.
+        "X-Assert-Status-Code": "200",
       }
       if (params.rawHtml) headers["X-Respond-With"] = "html"
       return headers
