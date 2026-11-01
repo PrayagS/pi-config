@@ -1,14 +1,11 @@
 import { extractTavily } from "../../providers/tavily"
 import type { WebExtractItem, WebExtractProviderParams } from "./types"
-import { emptyScatter, hasAny, selectPending } from "./utils"
+import { emptyScatter, hasAny, matchResults, selectPending, urlSet } from "./utils"
 
 function failedUrls(json: any): Set<string> {
-  const failed = new Set<string>()
-  if (!Array.isArray(json?.failed_results)) return failed
-  for (const item of json.failed_results) {
-    if (typeof item?.url === "string") failed.add(item.url)
-  }
-  return failed
+  return urlSet(
+    Array.isArray(json?.failed_results) ? json.failed_results.map((item: any) => item?.url) : []
+  )
 }
 
 export async function extractTavilyTargeted({
@@ -35,11 +32,15 @@ export async function extractTavilyTargeted({
   )
   if (!json) return null
 
-  const failed = failedUrls(json)
   const output = emptyScatter<WebExtractItem>(urls)
-  for (const [resultIndex, { url, index }] of selected.entries()) {
-    if (failed.has(url)) continue
-    const result = json?.results?.[resultIndex]
+  const matched = matchResults<any>(
+    selected,
+    json?.results,
+    (result) => [result?.url],
+    failedUrls(json)
+  )
+  for (const { url, index } of selected) {
+    const result = matched.get(index)
     const content = result?.raw_content
     if (typeof content !== "string" || !content.trim()) continue
     output[index] = {

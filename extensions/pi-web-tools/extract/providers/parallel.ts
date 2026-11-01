@@ -1,14 +1,9 @@
 import { extractParallel } from "../../providers/parallel"
 import type { WebExtractItem, WebExtractProviderParams } from "./types"
-import { emptyScatter, hasAny, selectPending } from "./utils"
+import { emptyScatter, hasAny, matchResults, selectPending, urlSet } from "./utils"
 
 function failedUrls(json: any): Set<string> {
-  const failed = new Set<string>()
-  if (!Array.isArray(json?.errors)) return failed
-  for (const error of json.errors) {
-    if (typeof error?.url === "string") failed.add(error.url)
-  }
-  return failed
+  return urlSet(Array.isArray(json?.errors) ? json.errors.map((error: any) => error?.url) : [])
 }
 
 export async function extractParallelTargeted({
@@ -29,11 +24,15 @@ export async function extractParallelTargeted({
   )
   if (!json) return null
 
-  const failed = failedUrls(json)
   const output = emptyScatter<WebExtractItem>(urls)
-  for (const [resultIndex, { url, index }] of selected.entries()) {
-    if (failed.has(url)) continue
-    const result = json?.results?.[resultIndex]
+  const matched = matchResults<any>(
+    selected,
+    json?.results,
+    (result) => [result?.url],
+    failedUrls(json)
+  )
+  for (const { url, index } of selected) {
+    const result = matched.get(index)
     const excerpts = result?.excerpts
     if (!Array.isArray(excerpts) || excerpts.length === 0) continue
     const clean = excerpts.filter((excerpt: unknown): excerpt is string =>

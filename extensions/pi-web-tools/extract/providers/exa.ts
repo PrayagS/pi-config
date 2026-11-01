@@ -1,14 +1,10 @@
 import { getExaContents } from "../../providers/exa"
 import type { WebExtractItem, WebExtractProviderParams } from "./types"
-import { emptyScatter, hasAny, selectPending } from "./utils"
+import { emptyScatter, hasAny, matchResults, selectPending, urlSet } from "./utils"
 
-function statusOk(json: any, url: string): boolean {
-  const statuses = json?.statuses
-  if (!Array.isArray(statuses)) return true
-  const status = statuses.find(
-    (s: any) => s?.id === url || s?.id === decodeURIComponent(url)
-  )
-  return Boolean(status && status.status === "success")
+function failedUrls(json: any): Set<string> {
+  const statuses = Array.isArray(json?.statuses) ? json.statuses : []
+  return urlSet(statuses.filter((s: any) => s?.status !== "success").map((s: any) => s?.id))
 }
 
 export async function extractExa({
@@ -29,9 +25,14 @@ export async function extractExa({
   if (!json) return null
 
   const output = emptyScatter<WebExtractItem>(urls)
-  for (const [resultIndex, { url, index }] of selected.entries()) {
-    if (!statusOk(json, url)) continue
-    const result = json?.results?.[resultIndex]
+  const matched = matchResults<any>(
+    selected,
+    json?.results,
+    (result) => [result?.id, result?.url],
+    failedUrls(json)
+  )
+  for (const { url, index } of selected) {
+    const result = matched.get(index)
     const content = result?.summary
     if (typeof content !== "string" || !content.trim()) continue
     output[index] = {
