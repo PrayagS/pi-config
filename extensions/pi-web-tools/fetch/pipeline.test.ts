@@ -62,7 +62,7 @@ describe("fetch provider errors", () => {
           statuses: [{ id: TARGET, status: "error", error: { tag: "CRAWL_NOT_FOUND", httpStatusCode: 404 } }],
         })
       }
-      if (url.startsWith("https://markdown.new/")) return new Response("", { status: 429 })
+      if (url === "https://markdown.new/") return new Response("", { status: 429 })
       return html("<h1>Hello</h1><p>Body text that is long enough to be kept by the extractor.</p>")
     }
     const result = await fetchAndExtract(TARGET)
@@ -89,12 +89,23 @@ describe("fetch provider errors", () => {
 
   test("unconfigured providers are skipped without an error entry", async () => {
     respond = (url) =>
-      url.startsWith("https://markdown.new/")
-        ? new Response("# From markdown.new\n\ntext", { status: 200 })
+      url === "https://markdown.new/"
+        ? json({ success: true, url: TARGET, title: "Converted Content", content: "# From markdown.new\n\ntext" })
         : new Response("", { status: 404 })
     const result = await fetchAndExtract(TARGET)
     expect(result.stage).toBe("markdown-new")
+    expect(result.title).toBe("From markdown.new")
     expect(result.providerErrors).toBeUndefined()
+  })
+
+  test("markdown.new: POSTs the target URL so its query string stays intact", async () => {
+    const withQuery = `${TARGET}?method=browser&retain_images=true`
+    respond = (url) =>
+      url === "https://markdown.new/" ? json({ success: true, content: "text" }) : new Response("", { status: 404 })
+    await fetchAndExtract(withQuery)
+    const call = requests.find((r) => r.url === "https://markdown.new/")
+    expect(call?.init.method).toBe("POST")
+    expect(JSON.parse(String(call?.init.body))).toEqual({ url: withQuery })
   })
 
   test("a forced stage reports the provider's reason", async () => {
