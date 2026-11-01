@@ -152,3 +152,17 @@ describe("per-URL provider errors", () => {
     expect(requests[1].body.urls).toEqual([B])
   })
 })
+
+describe("tavily response schema", () => {
+  test("no title is invented and raw_content is not duplicated into metadata", async () => {
+    respond = () =>
+      json({ results: [{ url: A, raw_content: "A chunks", favicon: "https://a.dev/favicon.ico" }], failed_results: [] })
+    const out = await extractTavilyTargeted({ urls: [A], mode: "targeted", prompt: "p" })
+    expect(out?.[0]).toEqual({
+      url: A,
+      content: "A chunks",
+      source: "tavily",
+      metadata: { url: A, favicon: "https://a.dev/favicon.ico" },
+    })
+  })
+})

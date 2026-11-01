@@ -9,10 +9,26 @@ export interface TavilyExtractParams {
   format?: "markdown" | "text"
 }
 
+/** POST /extract 200 response (https://docs.tavily.com/documentation/api-reference/endpoint/extract). */
+export interface TavilyExtractResponse {
+  /** Successful URLs only; output order is not guaranteed. */
+  results?: Array<{
+    url: string
+    /** Full page, or the top-ranked chunks joined by "[...]" when `query` is set. */
+    raw_content: string
+    images?: string[]
+    favicon?: string
+  }>
+  failed_results?: Array<{ url: string; error: string }>
+  response_time?: number
+  usage?: { credits?: number }
+  request_id?: string
+}
+
 export async function extractTavily(
   params: TavilyExtractParams,
   signal?: AbortSignal
-): Promise<any | null> {
+): Promise<TavilyExtractResponse | null> {
   return postJson({
     url: "https://api.tavily.com/extract",
     apiKeyEnv: "WEB_TOOLS_TAVILY_API_KEY",

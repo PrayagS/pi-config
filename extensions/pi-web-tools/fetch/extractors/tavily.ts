@@ -16,12 +16,9 @@ export const tavily: Extractor = {
       throw new Error(typeof failed[0]?.error === "string" ? failed[0].error : "extraction failed")
     }
 
+    // Tavily returns no title; buildResult falls back to the first heading.
     const content = json?.results?.[0]?.raw_content
     if (typeof content !== "string" || !content.trim()) throw new Error("no content in response")
-    const title = json?.results?.[0]?.title
-    return {
-      markdown: content.trim(),
-      metadata: title ? { title } : undefined,
-    }
+    return { markdown: content.trim() }
   },
 }
