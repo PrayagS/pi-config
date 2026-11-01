@@ -166,3 +166,18 @@ describe("tavily response schema", () => {
     })
   })
 })
+
+describe("firecrawl highlights", () => {
+  test("targeted mode falls back to Firecrawl highlights with the prompt as query", async () => {
+    const { runWebExtract } = await import("../pipeline")
+    for (const key of KEYS) delete process.env[key]
+    process.env.WEB_TOOLS_FIRECRAWL_API_KEY = "k"
+    respond = () =>
+      json({ success: true, data: { highlights: "relevant text", metadata: { title: "A page", statusCode: 200 } } })
+    const out = await runWebExtract({} as any, { urls: [A], mode: "targeted", prompt: "what is x?" })
+    delete process.env.WEB_TOOLS_FIRECRAWL_API_KEY
+    expect(requests.map((r) => r.url)).toEqual(["https://api.firecrawl.dev/v2/scrape"])
+    expect(requests[0].body).toEqual({ url: A, formats: [{ type: "highlights", query: "what is x?" }] })
+    expect(out.results[0]).toMatchObject({ source: "firecrawl", title: "A page", content: "relevant text" })
+  })
+})

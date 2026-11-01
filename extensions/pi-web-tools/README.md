@@ -128,18 +128,19 @@ Extract summaries or targeted information from up to 5 URLs.
 ### Provider order
 
 - `summary`: Firecrawl → Exa → Kagi CLI
-- `targeted`: Exa → Parallel → Tavily
+- `targeted`: Exa → Parallel → Tavily → Firecrawl highlights
 
 Set `WEB_TOOLS_EXTRACT_STAGE` to force one provider:
 
 - `summary`: `firecrawl`, `exa`, `kagi`
-- `targeted`: `exa`, `parallel`, `tavily`
+- `targeted`: `exa`, `parallel`, `tavily`, `firecrawl`
 
-Firecrawl is single-URL only, so summary mode fans out one scrape request per URL before falling back to Exa for missing URLs.
+Firecrawl is single-URL only, so it fans out one scrape request per URL. Targeted mode uses its `highlights` format (5 credits per page), so it runs last.
 
 ### Response mapping
 
 - Firecrawl summary → `data.summary`
+- Firecrawl targeted → `data.highlights`
 - Exa summary/targeted → `results[].summary`
 - Kagi summary → `data.markdown`
 - Parallel targeted → `results[].excerpts[]`

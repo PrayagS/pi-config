@@ -1,6 +1,6 @@
 import { extractExa } from "./providers/exa"
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
-import { extractFirecrawlSummary } from "./providers/firecrawl"
+import { extractFirecrawl } from "./providers/firecrawl"
 import { createKagiSummaryExtractor } from "./providers/kagi"
 import { extractParallelTargeted } from "./providers/parallel"
 import { extractTavilyTargeted } from "./providers/tavily"
@@ -69,7 +69,7 @@ export async function runWebExtract(
 ): Promise<WebExtractOutput> {
   const extractKagiSummary = createKagiSummaryExtractor(pi)
   const providersByName: Record<string, WebExtractProvider> = {
-    firecrawl: extractFirecrawlSummary,
+    firecrawl: extractFirecrawl,
     exa: extractExa,
     parallel: extractParallelTargeted,
     tavily: extractTavilyTargeted,
@@ -77,7 +77,8 @@ export async function runWebExtract(
   }
   const supportedStages = {
     summary: ["firecrawl", "exa", "kagi"],
-    targeted: ["exa", "parallel", "tavily"],
+    // Firecrawl highlights last: it bills 5 credits per page.
+    targeted: ["exa", "parallel", "tavily", "firecrawl"],
   }
 
   const envStage = process.env.WEB_TOOLS_EXTRACT_STAGE
