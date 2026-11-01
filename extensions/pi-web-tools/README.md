@@ -66,7 +66,7 @@ Provider order: Parallel → Exa → Kagi CLI → You.com → Firecrawl → Tavi
 - `age?` — restrict result age where supported: `day`, `week`, `month`, `year` (Kagi, Firecrawl, Tavily, Parallel, Exa, You.com)
 - `includeDomains?` — restrict results to these domains (Kagi query operators, Firecrawl, Tavily, Parallel, Exa, You.com)
 - `excludeDomains?` — exclude results from these domains (Kagi query operators, Firecrawl, Tavily, Parallel, Exa, You.com)
-- `includeContent?` — include provider-supported page content in result snippets; uses Firecrawl markdown, Tavily markdown, Parallel excerpts, Exa summaries, and You.com markdown. Kagi is skipped when enabled.
+- `includeContent?` — include provider-supported page content in result snippets; uses Firecrawl markdown, Tavily markdown, Parallel long excerpts, Exa page text, and You.com markdown, capped at 8,000 characters per result. Kagi is skipped when enabled.
 
 Kagi requires the `kagi` CLI to be installed and authenticated. API providers reuse existing web fetch credentials:
 
@@ -95,6 +95,8 @@ Fetch a URL and return clean, readable Markdown content, or raw HTML when reques
    - You.com (`WEB_TOOLS_YOU_API_KEY`)
    - markdown.new proxy
 4. **Defuddle** — default HTML extraction
+
+A provider that fails (HTTP error, provider-reported crawl failure, target error page) is skipped; its reason is kept in `details.providerErrors`, or appended to the error if every stage fails.
 
 Large outputs are truncated to Pi limits and saved to a temp file for paging.
 
@@ -139,10 +141,12 @@ Firecrawl is single-URL only, so it fans out one scrape request per URL. Targete
 
 ### Response mapping
 
+Batch results are matched to URLs by URL, not position. A URL no provider could extract reports each provider's reason.
+
 - Firecrawl summary → `data.summary`
 - Firecrawl targeted → `data.highlights`
 - Exa summary/targeted → `results[].summary`
-- Kagi summary → `data.markdown`
+- Kagi summary → `data.markdown` (HTML despite the name; converted to Markdown, leading `Title:` line used as the title)
 - Parallel targeted → `results[].excerpts[]`
 - Tavily targeted → `results[].raw_content`
 
