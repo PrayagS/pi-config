@@ -20,12 +20,14 @@ export interface WebSearchQueryOutput {
   source?: string
   results: WebSearchResult[]
   errors: string[]
+  warnings: string[]
 }
 
 export interface WebSearchPipelineOutput {
   resultSets: WebSearchResult[][]
   queryOutputs: WebSearchQueryOutput[]
   errors: string[]
+  warnings: string[]
 }
 
 const providerNames = ["parallel", "exa", "kagi", "you", "firecrawl", "tavily"] as const
@@ -65,13 +67,15 @@ export async function runWebSearch(
   const queryOutputs = await Promise.all(
     params.queries.map(async (query): Promise<WebSearchQueryOutput> => {
       const errors: string[] = []
+      const warnings: string[] = []
       for (const name of order) {
         if (signal?.aborted) throw new Error("cancelled")
         try {
           const output = await registry[name]({ ...params, query, signal })
           if (!output) continue
+          warnings.push(...(output.warnings ?? []).map((w) => `${name}: ${w}`))
           if (output.results.length > 0) {
-            return { query, source: output.source, results: output.results, errors }
+            return { query, source: output.source, results: output.results, errors, warnings }
           }
           errors.push(`${name}: no results`)
         } catch (e: any) {
@@ -79,7 +83,7 @@ export async function runWebSearch(
         }
       }
 
-      return { query, results: [], errors }
+      return { query, results: [], errors, warnings }
     })
   )
 
@@ -88,6 +92,9 @@ export async function runWebSearch(
     queryOutputs,
     errors: queryOutputs.flatMap((output) =>
       output.errors.map((error) => `Query "${output.query}": ${error}`)
+    ),
+    warnings: queryOutputs.flatMap((output) =>
+      output.warnings.map((warning) => `Query "${output.query}": ${warning}`)
     ),
   }
 }

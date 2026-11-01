@@ -43,6 +43,11 @@ export function renderResult(
     text += `\n${theme.fg("muted", `  ${sources}`)}`
   }
 
+  if (details?.warnings?.length) {
+    text += `\n${theme.fg("warning", `  \u26a0 ${details.warnings.length} provider warning(s)`)}`
+    if (expanded) text += `\n${theme.fg("dim", details.warnings.map((w) => `  ${w}`).join("\n"))}`
+  }
+
   if (expanded) {
     const content = result.content[0]
     if (content?.type === "text") {

@@ -35,5 +35,7 @@ export interface WebSearchDetails {
   resultCount: number
   urls?: string[]
   sources?: Record<string, number>
+  /** Provider request warnings; kept out of model-visible content. */
+  warnings?: string[]
   error?: string
 }

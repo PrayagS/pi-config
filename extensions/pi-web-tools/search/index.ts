@@ -128,7 +128,7 @@ export function createWebSearchTool(pi: ExtensionAPI) {
         }
       }
 
-      const { resultSets, errors } = output
+      const { resultSets, errors, warnings } = output
 
       const totalCount = resultSets.reduce((sum, r) => sum + r.length, 0)
       const allUrls = resultSets.flatMap((r) => r.map((item) => item.url))
@@ -147,7 +147,12 @@ export function createWebSearchTool(pi: ExtensionAPI) {
               text: `No results found for: ${queries.join(", ")}`,
             },
           ],
-          details: { queries, limit, resultCount: 0 } as WebSearchDetails,
+          details: {
+            queries,
+            limit,
+            resultCount: 0,
+            ...(warnings.length > 0 ? { warnings } : {}),
+          } as WebSearchDetails,
         }
       }
 
@@ -161,6 +166,7 @@ export function createWebSearchTool(pi: ExtensionAPI) {
           resultCount: totalCount,
           urls: allUrls,
           sources,
+          ...(warnings.length > 0 ? { warnings } : {}),
         } as WebSearchDetails,
       }
     },

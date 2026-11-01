@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
-import { postJson } from "../providers/http"
+import { postJsonOrThrow as postJson } from "../providers/http"
 import { buildKagiSearchArgs } from "../providers/kagi"
 import type { SearchAge, SearchFilters, WebSearchResult } from "./types"
 
@@ -14,6 +14,8 @@ export interface WebSearchProviderParams extends SearchFilters {
 export interface WebSearchProviderOutput {
   source: string
   results: WebSearchResult[]
+  /** Provider-reported request warnings (e.g. ignored fields). Not shown to the model. */
+  warnings?: string[]
 }
 
 export type WebSearchProvider = (
@@ -40,6 +42,14 @@ function firstText(...values: unknown[]) {
 
 function normalizeDate(value: unknown) {
   return text(value)
+}
+
+function warningMessages(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const messages = value
+    .map((w: any) => firstText(w?.message, typeof w === "string" ? w : undefined))
+    .filter((m): m is string => Boolean(m))
+  return messages.length > 0 ? messages : undefined
 }
 
 function startDateForAge(age: SearchAge | undefined) {
@@ -207,7 +217,11 @@ export const searchParallel: WebSearchProvider = async ({
   })
   if (!json) return null
   if (json.session_id) parallelSessionId = json.session_id
-  return { source: "parallel", results: compact((json.results ?? []).map((i: any) => normalizeResult(i, "parallel")), limit) }
+  return {
+    source: "parallel",
+    results: compact((json.results ?? []).map((i: any) => normalizeResult(i, "parallel")), limit),
+    warnings: warningMessages(json.warnings),
+  }
 }
 
 export const searchExa: WebSearchProvider = async ({
@@ -236,7 +250,11 @@ export const searchExa: WebSearchProvider = async ({
     timeout: TIMEOUT_MS,
   })
   if (!json) return null
-  return { source: "exa", results: compact((json.results ?? []).map((i: any) => normalizeResult(i, "exa")), limit) }
+  return {
+    source: "exa",
+    results: compact((json.results ?? []).map((i: any) => normalizeResult(i, "exa")), limit),
+    warnings: warningMessages(json.warnings),
+  }
 }
 
 export const searchYou: WebSearchProvider = async ({
