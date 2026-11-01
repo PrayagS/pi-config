@@ -2,8 +2,8 @@
 import { postJsonOrThrow as postJson } from "./http"
 
 export interface ExaContentsParams {
-  urls?: string[]
-  ids?: string[]
+  /** `ids` is the legacy, backwards-compatible name for this field. */
+  urls: string[]
   text?: boolean | Record<string, unknown>
   summary?: boolean | Record<string, unknown>
 }

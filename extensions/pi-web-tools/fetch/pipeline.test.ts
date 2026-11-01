@@ -129,3 +129,14 @@ describe("target error pages", () => {
     expect(headers["X-Assert-Status-Code"]).toBe("200")
   })
 })
+
+describe("exa contents request", () => {
+  test("sends the documented urls field, not legacy ids", async () => {
+    process.env.WEB_TOOLS_FETCH_STAGE = "exa"
+    process.env.WEB_TOOLS_EXA_API_KEY = "k"
+    respond = () => json({ results: [{ id: TARGET, text: "page text" }], statuses: [{ id: TARGET, status: "success" }] })
+    await fetchAndExtract(TARGET)
+    const body = JSON.parse(String(requests[0].init.body))
+    expect(body).toEqual({ urls: [TARGET], text: { verbosity: "full" } })
+  })
+})

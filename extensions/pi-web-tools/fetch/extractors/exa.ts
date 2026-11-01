@@ -5,7 +5,7 @@ export const exa: Extractor = {
   name: "exa",
   async extract(url, signal) {
     const json = await getExaContents(
-      { ids: [url], text: { verbosity: "full" } },
+      { urls: [url], text: { verbosity: "full" } },
       signal
     )
     if (!json) return null
