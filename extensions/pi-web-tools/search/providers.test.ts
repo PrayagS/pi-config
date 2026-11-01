@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { buildKagiSearchArgs } from "../providers/kagi"
 import { ageCutoffDate } from "./age"
-import { CONTENT_MAX_CHARS, searchExa, searchParallel, searchTavily, searchYou } from "./providers"
+import {
+  CONTENT_MAX_CHARS,
+  bareHostname,
+  searchExa,
+  searchFirecrawl,
+  searchParallel,
+  searchTavily,
+  searchYou,
+} from "./providers"
 
 const KEYS = [
   "WEB_TOOLS_EXA_API_KEY",
@@ -147,6 +155,33 @@ describe("you.com", () => {
       })
     const out = await searchYou({ query: "q", limit: 10 })
     expect(out?.results.map((r) => r.snippet)).toEqual(["s1\n\ns2", "h1"])
+  })
+})
+
+describe("firecrawl", () => {
+  test("bounds server timeouts and strips domains to bare hostnames", async () => {
+    await searchFirecrawl({
+      query: "q",
+      limit: 10,
+      includeDomains: ["https://docs.firecrawl.dev/api-reference", "example.com"],
+      includeContent: true,
+    })
+    const { body } = requests[0]
+    expect(body.timeout).toBe(12000)
+    expect(body.includeDomains).toEqual(["docs.firecrawl.dev", "example.com"])
+    expect(body.scrapeOptions).toEqual({ formats: [{ type: "markdown" }], timeout: 10000 })
+  })
+
+  test("falls back to metadata url and title", async () => {
+    respond = () =>
+      json({ data: { web: [{ metadata: { sourceURL: "https://a.dev", title: "Meta" }, markdown: "md" }] } })
+    const out = await searchFirecrawl({ query: "q", limit: 10 })
+    expect(out?.results[0]).toMatchObject({ url: "https://a.dev", title: "Meta", snippet: "md" })
+  })
+
+  test("bareHostname leaves plain hostnames alone", () => {
+    expect(bareHostname(" github.com ")).toBe("github.com")
+    expect(bareHostname("http://localhost:3000/x")).toBe("localhost")
   })
 })
 

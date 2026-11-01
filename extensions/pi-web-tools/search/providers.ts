@@ -68,8 +68,25 @@ function warningMessages(value: unknown): string[] | undefined {
   return messages.length > 0 ? messages : undefined
 }
 
+/** Firecrawl domain filters accept bare hostnames only (no scheme or path). */
+export function bareHostname(domain: string) {
+  const trimmed = domain.trim()
+  try {
+    return new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`).hostname || trimmed
+  } catch {
+    return trimmed
+  }
+}
+
 function normalizeResult(item: any, source: string): WebSearchResult | null {
-  const url = firstText(item?.url, item?.link, item?.sourceUrl, item?.sourceURL)
+  const url = firstText(
+    item?.url,
+    item?.link,
+    item?.sourceUrl,
+    item?.sourceURL,
+    item?.metadata?.url,
+    item?.metadata?.sourceURL
+  )
   if (!url) return null
   const snippets =
     strings(item?.snippets) ??
@@ -88,7 +105,7 @@ function normalizeResult(item: any, source: string): WebSearchResult | null {
     snippets?.join("\n\n")
   )
   return {
-    title: firstText(item?.title, item?.name) ?? url,
+    title: firstText(item?.title, item?.name, item?.metadata?.title) ?? url,
     url,
     snippet: capContent(snippet),
     published: normalizeDate(
@@ -144,11 +161,12 @@ export const searchFirecrawl: WebSearchProvider = async ({
   includeContent,
   signal,
 }) => {
-  const body: Record<string, unknown> = { query, limit }
+  // Firecrawl's server-side default is 60s; keep it inside our client timeout.
+  const body: Record<string, unknown> = { query, limit, timeout: 12_000 }
   if (age) body.tbs = { day: "qdr:d", week: "qdr:w", month: "qdr:m", year: "qdr:y" }[age]
-  if (includeDomains?.length) body.includeDomains = includeDomains
-  if (excludeDomains?.length) body.excludeDomains = excludeDomains
-  if (includeContent) body.scrapeOptions = { formats: [{ type: "markdown" }] }
+  if (includeDomains?.length) body.includeDomains = includeDomains.map(bareHostname)
+  if (excludeDomains?.length) body.excludeDomains = excludeDomains.map(bareHostname)
+  if (includeContent) body.scrapeOptions = { formats: [{ type: "markdown" }], timeout: 10_000 }
   const json = await postJson<any>({
     url: "https://api.firecrawl.dev/v2/search",
     apiKeyEnv: "WEB_TOOLS_FIRECRAWL_API_KEY",
