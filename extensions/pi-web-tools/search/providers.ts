@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
 import { postJsonOrThrow as postJson } from "../providers/http"
 import { buildKagiSearchArgs } from "../providers/kagi"
-import { ageCutoffDate } from "./age"
+import { ageCutoff, ageCutoffDate } from "./age"
 import type { SearchFilters, WebSearchResult } from "./types"
 
 const TIMEOUT_MS = 15_000
@@ -249,10 +249,17 @@ export const searchExa: WebSearchProvider = async ({
       query,
       type: "auto",
       numResults: limit,
-      startPublishedDate: ageCutoffDate(age),
+      startPublishedDate: ageCutoff(age)?.toISOString(),
       includeDomains,
       excludeDomains,
-      contents: includeContent ? { summary: true } : { highlights: true },
+      contents: {
+        // Capped page text instead of `summary`, which runs an extra paid LLM call per page.
+        ...(includeContent
+          ? { text: { maxCharacters: CONTENT_MAX_CHARS } }
+          : { highlights: true }),
+        // Default livecrawl timeout is 10s; leave room inside our 15s budget.
+        livecrawlTimeout: 5_000,
+      },
     },
     signal,
     timeout: TIMEOUT_MS,

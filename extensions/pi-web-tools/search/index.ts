@@ -61,7 +61,7 @@ export function createWebSearchTool(pi: ExtensionAPI) {
       includeContent: Type.Optional(
         Type.Boolean({
           description:
-            "When true, request provider-supported page content from search results. Uses Firecrawl markdown, Tavily markdown, Parallel long excerpts, Exa summaries, and You.com markdown; unsupported providers are skipped.",
+            "When true, request provider-supported page content from search results. Uses Firecrawl markdown, Tavily markdown, Parallel long excerpts, Exa page text, and You.com markdown; unsupported providers are skipped.",
         })
       ),
     }),

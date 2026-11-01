@@ -77,3 +77,17 @@ describe("parallel", () => {
     expect(out?.results[0].snippet).toBe("one\ntwo")
   })
 })
+
+describe("exa", () => {
+  test("sends ISO date-time and capped text instead of summary", async () => {
+    await searchExa({ query: "q", limit: 10, age: "week", includeContent: true })
+    const { body } = requests[0]
+    expect(body.startPublishedDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
+    expect(body.contents).toEqual({ text: { maxCharacters: CONTENT_MAX_CHARS }, livecrawlTimeout: 5000 })
+  })
+
+  test("keeps highlights for the default snippet path", async () => {
+    await searchExa({ query: "q", limit: 10 })
+    expect(requests[0].body.contents).toEqual({ highlights: true, livecrawlTimeout: 5000 })
+  })
+})
