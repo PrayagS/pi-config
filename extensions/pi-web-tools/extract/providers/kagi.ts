@@ -1,20 +1,37 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
+import TurndownService from "turndown"
 import type { WebExtractItem, WebExtractProviderParams } from "./types"
 import { emptyScatter, hasAny, selectPending } from "./utils"
 
 const TIMEOUT_MS = 30_000
 
+/** `kagi summarize --subscriber` JSON (kagi-cli SubscriberSummarization). No title or url. */
 interface KagiResponse {
   data?: {
+    thread_id?: unknown
+    state?: unknown
+    /** Despite the name, the subscriber summarizer returns HTML here. */
     markdown?: unknown
-    title?: unknown
-    url?: unknown
   }
 }
 
-function extractMarkdown(response: KagiResponse): string | null {
-  const content = response.data?.markdown
-  return typeof content === "string" && content.trim() ? content.trim() : null
+let turndown: TurndownService | undefined
+
+/**
+ * Convert the summary to Markdown and split off the "Title: ..." line the
+ * summarizer puts first.
+ */
+export function parseKagiSummary(value: unknown): { title?: string; content: string } | null {
+  if (typeof value !== "string" || !value.trim()) return null
+  let content = value.trim()
+  if (content.startsWith("<")) {
+    turndown ??= new TurndownService({ headingStyle: "atx", bulletListMarker: "-", codeBlockStyle: "fenced" })
+    content = turndown.turndown(content).trim()
+  }
+  const match = content.match(/^(?:\*\*)?Title:(?:\*\*)?\s*(.+?)\s*(?:\n+|$)/)
+  if (!match) return content ? { content } : null
+  const rest = content.slice(match[0].length).trim()
+  return rest ? { title: match[1], content: rest } : { content }
 }
 
 function errorText(error: unknown) {
@@ -73,19 +90,20 @@ export function createKagiSummaryExtractor(pi: ExtensionAPI) {
 
       try {
         const response = JSON.parse(stdout) as KagiResponse
-        const markdown = extractMarkdown(response)
-        if (!markdown) {
+        const summary = parseKagiSummary(response.data?.markdown)
+        if (!summary) {
           output[index] = { url, error: "empty summary" }
           continue
         }
 
-        const title = response.data?.title
+        // Keep the thread id, not the full payload (prompt, documents, metadata_html).
+        const threadId = response.data?.thread_id
         output[index] = {
           url,
-          title: typeof title === "string" ? title : undefined,
-          content: markdown,
+          title: summary.title,
+          content: summary.content,
           source: "kagi",
-          metadata: response.data,
+          metadata: typeof threadId === "string" && threadId ? { thread_id: threadId } : undefined,
         }
       } catch {
         output[index] = { url, error: "invalid JSON from kagi CLI" }
