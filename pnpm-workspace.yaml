@@ -1,3 +1,5 @@
 # pnpm refuses build scripts of git-hosted dependencies unless listed here. mpl builds its dist/ in prepare.
 allowBuilds:
   "mpl@https://codeload.github.com/ivarvong/mpl/tar.gz/117503cc96a3a9ec583e90a97026b720c0699d5d": true
+  # postinstall only plays a spinner demo on the TTY; dist/ ships prebuilt.
+  unicode-animations: false

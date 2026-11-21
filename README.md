@@ -71,6 +71,12 @@ These definitions are meant to be used with the [pi-interactive-subagents](https
   - `agents/worker.md`
   - `agents/researcher.md`
 
+## Development
+
+- Dependencies are managed with [aube](https://aube.sh). Run `aube install`, or `aubr <script>`, which installs first when dependencies are stale. `aube-lock.yaml` is the committed lockfile.
+- Keep `.npmrc` and `pnpm-workspace.yaml`. `pi install` uses npm (or pnpm/Bun) for git sources, and those files let it fetch and build the `mpl` git dependency.
+- Run [fallow](https://fallow.tools) (`fallow`, `fallow dead-code`) to find unused code, duplication, and complexity hotspots. Config is in `.fallowrc.jsonc`.
+
 ## Notes
 
 - `pi install` exports only extensions and skills listed in `package.json`.

@@ -27,3 +27,6 @@ venv/
 
 # .pi folders
 **/.pi/
+
+# fallow cache
+.fallow/

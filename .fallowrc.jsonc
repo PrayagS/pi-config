@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  // Pi loads the files listed under package.json `pi.extensions`; fallow does not read that field.
+  "entry": [
+    "extensions/*/index.ts",
+    "extensions/*.ts",
+    "extensions/**/*.test.ts"
+  ],
+  // Untracked checkouts of other repos that live inside this working copy.
+  "ignorePatterns": [
+    "pi-extensions/**",
+    "pi-subagents-lite/**",
+    "simple-subagents/**"
+  ],
+  // Pi provides these to extensions at runtime as virtual modules.
+  "ignoreDependencies": [
+    "@earendil-works/*",
+    "@mariozechner/*",
+    "@sinclair/typebox",
+    "typebox"
+  ],
+  // Installed outside package.json (mise, system).
+  "ignoreBinaries": ["biome", "jj"],
+  "workspaces": {
+    // These package.json files only set `"type": "module"`; the dependencies
+    // are declared in the root package.json.
+    "settings": {
+      "extensions/pi-web-tools": {
+        "ignoreDependencies": ["defuddle", "jsdom", "turndown"]
+      },
+      "extensions/mpl": { "ignoreDependencies": ["mpl"] }
+    }
+  }
+}
