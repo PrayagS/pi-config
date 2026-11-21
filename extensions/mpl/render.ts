@@ -14,8 +14,6 @@ import { MPL_CHARTS_ROOT, MPL_DEFAULT_THEME } from "./constants.ts"
 import { checkSpecLimits } from "./limits.ts"
 import { buildFigure, type MplCall, type MplGrid } from "./replay.ts"
 
-export { MPL_DEFAULT_THEME }
-
 registerFonts(...allFonts)
 registerColormaps(...allColormaps)
 registerColormapRgba(...allColormapRgba)
@@ -23,7 +21,7 @@ registerColormapRgba(...allColormapRgba)
 /** Themes this extension ships as .mplstyle files under styles/. */
 const LOCAL_THEMES = ["gruvbox-dark", "gruvbox-light"] as const
 /** Hi-dpi by default: 2x pixels, 1440x840 at the themes' 7.2x4.2 in figure size. */
-export const MPL_DEFAULT_SCALE = 2
+const MPL_DEFAULT_SCALE = 2
 /** Every accepted theme name: local ones first, then mpl's bundled styles (pro-slate, pro-dark, ggplot, ...). */
 export const MPL_THEMES: readonly string[] = [
   ...LOCAL_THEMES,
@@ -88,7 +86,7 @@ export function localTime(now: Date): string {
 }
 
 /** Default output directory: ~/.pi/agent/work/charts/<YYYY-MM-DD>, local date. */
-export function defaultChartDir(now = new Date()): string {
+function defaultChartDir(now = new Date()): string {
   return join(MPL_CHARTS_ROOT, localDate(now))
 }
 

@@ -22,7 +22,7 @@ export type DraftAttachment = {
 	originalPath: string;
 };
 
-export type EditorHooks = {
+type EditorHooks = {
 	publishDraft: (attachments: DraftAttachment[]) => void;
 	queuePendingSubmission: (submission: PendingSubmission) => void;
 	sendImagesOnly: (images: ImageContent[]) => void;

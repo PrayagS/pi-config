@@ -27,7 +27,7 @@ export function destination(ctx: ExtensionContext, config: SummaryConfig): strin
   return config.model === "default" ? ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "(no model selected)" : config.model;
 }
 
-export function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) return Promise.reject(new Error("Summarization cancelled"));
   return new Promise<T>((resolve, reject) => {
     const cancel = () => { cleanup(); reject(new Error("Summarization cancelled")); };

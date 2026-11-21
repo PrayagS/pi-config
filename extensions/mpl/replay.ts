@@ -45,7 +45,7 @@ export interface MplFigureSpec {
 }
 
 /** Thrown for a spec mistake (unknown method, bad index); the message is meant for the model. */
-export class MplSpecError extends Error {
+class MplSpecError extends Error {
   override readonly name = "MplSpecError"
 }
 
@@ -93,7 +93,7 @@ export const MPL_FIGURE_METHODS: ReadonlySet<string> = new Set(
   )
 )
 /** Pseudo-calls the replayer handles itself. */
-export const MPL_SPECIAL_CALLS = [
+const MPL_SPECIAL_CALLS = [
   "sca",
   "twinx",
   "$concise_x",

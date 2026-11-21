@@ -104,7 +104,7 @@ function toText(value: unknown): string {
   return String(value)
 }
 
-export function parseRawHeaders(raw: unknown): Record<string, string> {
+function parseRawHeaders(raw: unknown): Record<string, string> {
   const out: Record<string, string> = {}
   if (!Array.isArray(raw)) return out
   for (let i = 0; i + 1 < raw.length; i += 2) {

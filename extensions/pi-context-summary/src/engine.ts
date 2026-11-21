@@ -6,9 +6,9 @@ import type { SummaryConfig } from "./config.js";
 export const SUMMARY_TYPE = "context-summary/v1";
 export const STATE_TYPE = "context-summary/state-v1";
 export const CALL_TYPE = "context-summary/call-v1";
-export const RECALL_TOOL = "context_recall";
+const RECALL_TOOL = "context_recall";
 export const MAX_RECALL_CHARS = 8192;
-export const MAX_RECALL_BYTES = 32768;
+const MAX_RECALL_BYTES = 32768;
 
 const REF = /^r_[A-Za-z0-9_-]{1,80}$/;
 const HEX = /^[0-9a-f]{64}$/;
