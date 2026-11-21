@@ -40,6 +40,7 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/working-indicator/` — phase-aware working spinner (thinking/tool/streaming/working)
 - `extensions/pi-images/` — image attachments with kitty graphics preview ([credits](extensions/pi-images/README.md#credits))
 - `extensions/zzz-system-prompt-filter/` — system prompt filtering
+- `extensions/mpl/` — codemode-only `mpl_render` tool for matplotlib-style PNG/SVG charts ([credits](extensions/mpl/README.md))
 
 ### Experimental
 

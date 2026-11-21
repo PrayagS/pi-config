@@ -44,7 +44,8 @@
       "./extensions/pi-better-prompt-editor/index.ts",
       "./extensions/pi-truncated-thinking-marker.ts",
       "./extensions/zzz-system-prompt-filter/index.ts",
-      "./extensions/anthropic-stall-probe/index.ts"
+      "./extensions/anthropic-stall-probe/index.ts",
+      "./extensions/mpl/index.ts"
     ],
     "skills": [
       "./skills"
@@ -66,13 +67,22 @@
     "test:caffeinate": "bun test extensions/caffeinate/index.test.ts",
     "test:co-authored-by": "bun test extensions/pi-co-authored-by/index.test.ts",
     "test:output-style": "bun test extensions/output-style/index.test.ts",
-    "test:anthropic-stall-probe": "node --test extensions/anthropic-stall-probe/probe.test.ts"
+    "test:anthropic-stall-probe": "node --test extensions/anthropic-stall-probe/probe.test.ts",
+    "test:mpl": "node --test extensions/mpl/mpl.test.ts extensions/mpl/display.test.ts"
   },
   "dependencies": {
     "defuddle": "^0.18.1",
     "jsdom": "^26.0.0",
+    "mpl": "github:ivarvong/mpl#117503cc96a3a9ec583e90a97026b720c0699d5d",
     "turndown": "^7.2.0",
     "unbash": "4.0.5",
     "unicode-animations": "^1.0.3"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-tui": "1.6.0",
+    "typebox": "1.3.27"
+  },
+  "allowScripts": {
+    "github:ivarvong/mpl#117503cc96a3a9ec583e90a97026b720c0699d5d": true
   }
 }
