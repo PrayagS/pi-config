@@ -1,3 +1,5 @@
+import type { WebExtractItem } from "./types"
+
 export interface SelectedUrl {
   url: string
   index: number
@@ -21,7 +23,7 @@ export function hasAny<T>(items: Array<T | null>): boolean {
  * Record provider-reported per-URL failures as error items (no `source`), so the
  * pipeline can report why a URL failed. URLs that already have content are kept.
  */
-export function scatterErrors<T extends { url: string; error?: string }>(
+function scatterErrors<T extends { url: string; error?: string }>(
   output: Array<T | { url: string; error: string } | null>,
   selected: SelectedUrl[],
   failures: Array<{ url: unknown; message: string }>
@@ -38,7 +40,7 @@ export function scatterErrors<T extends { url: string; error?: string }>(
 }
 
 /** Comparable form of a URL: no fragment, no trailing slash. */
-export function normalizeUrl(url: string): string {
+function normalizeUrl(url: string): string {
   try {
     const parsed = new URL(url.trim())
     parsed.hash = ""
@@ -48,7 +50,7 @@ export function normalizeUrl(url: string): string {
   }
 }
 
-export function urlSet(urls: unknown[]): Set<string> {
+function urlSet(urls: unknown[]): Set<string> {
   return new Set(
     urls.filter((url): url is string => typeof url === "string").map(normalizeUrl)
   )
@@ -60,7 +62,7 @@ export function urlSet(urls: unknown[]): Set<string> {
  * the wrong URL. A single leftover result is paired with a single leftover
  * non-failed URL (e.g. after a redirect); otherwise unmatched results are dropped.
  */
-export function matchResults<R>(
+function matchResults<R>(
   selected: SelectedUrl[],
   results: unknown,
   resultUrls: (result: R) => unknown[],
@@ -94,4 +96,31 @@ export function matchResults<R>(
     matched.set(leftoverUrls[0].index, leftoverResults[0])
   }
   return matched
+}
+
+/**
+ * Scatter one batch response back onto the requested URLs. Results are paired
+ * with URLs by `matchResults`, `toItem` turns each match into an item (or null
+ * when it has no usable content), and `failures` become error items for URLs
+ * left empty. Returns null when no URL got an item or an error.
+ */
+export function scatterBatch<R>(
+  urls: string[],
+  selected: SelectedUrl[],
+  batch: {
+    results: unknown
+    resultUrls: (result: R) => unknown[]
+    failures: Array<{ url: unknown; message: string }>
+  },
+  toItem: (url: string, result: R) => WebExtractItem | null
+): Array<WebExtractItem | null> | null {
+  const output = emptyScatter<WebExtractItem>(urls)
+  const failed = urlSet(batch.failures.map(({ url }) => url))
+  const matched = matchResults<R>(selected, batch.results, batch.resultUrls, failed)
+  for (const { url, index } of selected) {
+    const result = matched.get(index)
+    if (result !== undefined) output[index] = toItem(url, result)
+  }
+  scatterErrors(output, selected, batch.failures)
+  return hasAny(output) ? output : null
 }
