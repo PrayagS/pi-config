@@ -1,5 +1,1 @@
-export { handleGitHub } from "./github"
-export { handleHackerNews } from "./hackernews"
-export { handleReddit } from "./reddit"
 export { domainHandlers } from "./registry"
-export type { DomainHandler } from "./types"

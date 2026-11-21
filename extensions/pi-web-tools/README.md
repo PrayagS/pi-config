@@ -30,7 +30,7 @@ Pi extension providing `web_search`, `web_fetch`, `web_extract`, and `/web-tools
 │   ├── render.ts             #   render functions
 │   ├── truncate.ts           #   truncation helper
 │   ├── extractors/           #   API content extractor adapters
-│   │   ├── index.ts          #     barrel + apiExtractors registry
+│   │   ├── index.ts          #     apiExtractors registry
 │   │   ├── types.ts          #     Extractor interface
 │   │   ├── jina.ts → firecrawl.ts → parallel.ts → exa.ts → tavily.ts → you.ts
 │   │   └── markdown-new.ts
@@ -50,7 +50,7 @@ Pi extension providing `web_search`, `web_fetch`, `web_extract`, and `/web-tools
 
 1. Create `fetch/extractors/<name>.ts` implementing `Extractor`
 2. Export named const with `name` + `extract(url)` method
-3. Register in `fetch/extractors/index.ts` barrel + `apiExtractors` array
+3. Add it to the `apiExtractors` array in `fetch/extractors/index.ts`
 4. Add stage name to `ExtractionStage` union in `fetch/result.ts`
 
 ## `web_search`

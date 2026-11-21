@@ -6,20 +6,6 @@ export interface WebSearchResult {
   source?: string
 }
 
-export interface KagiResult extends WebSearchResult {
-  t: 0
-  rank: number
-}
-
-export interface KagiRelated {
-  t: 1
-  list: string[]
-}
-
-export interface KagiResponse {
-  data: Array<KagiResult | KagiRelated>
-}
-
 export type SearchAge = "day" | "week" | "month" | "year"
 
 export interface SearchFilters {

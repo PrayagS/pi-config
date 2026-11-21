@@ -5,7 +5,7 @@ import type { Extractor } from "./extractors"
 import { buildResult } from "./result"
 import type { FetchResult } from "./result"
 
-export type { ExtractionStage, FetchResult } from "./result"
+export type { FetchResult } from "./result"
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)

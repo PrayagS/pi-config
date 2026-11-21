@@ -8,7 +8,7 @@ import { tavily } from "./tavily"
 import { you } from "./you"
 
 export type { Extractor, ExtractResult } from "./types"
-export { exa, firecrawl, jina, markdownNew, parallel, tavily, you }
+export { firecrawl, jina, you }
 
 export const apiExtractors: Extractor[] = [
   jina,
