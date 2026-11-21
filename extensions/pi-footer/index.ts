@@ -387,15 +387,14 @@ async function fetchWithTimeout(
 
 // ============ Usage Fetchers ============
 
+function usageError(provider: string, error: string): UsageSnapshot {
+  return { provider, windows: [], error, fetchedAt: Date.now() }
+}
+
 async function fetchClaudeUsage(): Promise<UsageSnapshot> {
   const token = getClaudeToken()
   if (!token) {
-    return {
-      provider: "Claude",
-      windows: [],
-      error: "no-auth",
-      fetchedAt: Date.now(),
-    }
+    return usageError("Claude", "no-auth")
   }
 
   try {
@@ -410,12 +409,7 @@ async function fetchClaudeUsage(): Promise<UsageSnapshot> {
     )
 
     if (!res.ok) {
-      return {
-        provider: "Claude",
-        windows: [],
-        error: `HTTP ${res.status}`,
-        fetchedAt: Date.now(),
-      }
+      return usageError("Claude", `HTTP ${res.status}`)
     }
 
     const data = (await res.json()) as any
@@ -443,24 +437,14 @@ async function fetchClaudeUsage(): Promise<UsageSnapshot> {
 
     return { provider: "Claude", windows, fetchedAt: Date.now() }
   } catch (e) {
-    return {
-      provider: "Claude",
-      windows: [],
-      error: String(e),
-      fetchedAt: Date.now(),
-    }
+    return usageError("Claude", String(e))
   }
 }
 
 async function fetchCopilotUsage(): Promise<UsageSnapshot> {
   const token = getCopilotToken()
   if (!token) {
-    return {
-      provider: "Copilot",
-      windows: [],
-      error: "no-auth",
-      fetchedAt: Date.now(),
-    }
+    return usageError("Copilot", "no-auth")
   }
 
   try {
@@ -478,12 +462,7 @@ async function fetchCopilotUsage(): Promise<UsageSnapshot> {
     )
 
     if (!res.ok) {
-      return {
-        provider: "Copilot",
-        windows: [],
-        error: `HTTP ${res.status}`,
-        fetchedAt: Date.now(),
-      }
+      return usageError("Copilot", `HTTP ${res.status}`)
     }
 
     const data = (await res.json()) as any
@@ -511,24 +490,14 @@ async function fetchCopilotUsage(): Promise<UsageSnapshot> {
 
     return { provider: "Copilot", windows, fetchedAt: Date.now() }
   } catch (e) {
-    return {
-      provider: "Copilot",
-      windows: [],
-      error: String(e),
-      fetchedAt: Date.now(),
-    }
+    return usageError("Copilot", String(e))
   }
 }
 
 async function fetchCodexUsage(): Promise<UsageSnapshot> {
   const creds = getCodexToken()
   if (!creds) {
-    return {
-      provider: "Codex",
-      windows: [],
-      error: "no-auth",
-      fetchedAt: Date.now(),
-    }
+    return usageError("Codex", "no-auth")
   }
 
   const providerLabel = "Codex"
@@ -553,65 +522,41 @@ async function fetchCodexUsage(): Promise<UsageSnapshot> {
     )
 
     if (!res.ok) {
-      return {
-        provider: providerLabel,
-        windows: [],
-        error: `HTTP ${res.status}`,
-        fetchedAt: Date.now(),
-      }
+      return usageError(providerLabel, `HTTP ${res.status}`)
     }
 
     const data = (await res.json()) as any
     const windows: RateWindow[] = []
 
+    const toWindow = (w: any, fallbackLabel: string): RateWindow => ({
+      label: getWindowLabel(
+        typeof w.limit_window_seconds === "number"
+          ? w.limit_window_seconds * 1000
+          : undefined,
+        fallbackLabel
+      ),
+      usedPercent: clampPercent(w.used_percent || 0),
+      resetsIn: w.reset_at
+        ? formatResetTime(new Date(w.reset_at * 1000))
+        : undefined,
+    })
     if (data.rate_limit?.primary_window) {
-      const pw = data.rate_limit.primary_window
-      const resetDate = pw.reset_at ? new Date(pw.reset_at * 1000) : undefined
-      const durationMs =
-        typeof pw.limit_window_seconds === "number"
-          ? pw.limit_window_seconds * 1000
-          : undefined
-      windows.push({
-        label: getWindowLabel(durationMs, "5h"),
-        usedPercent: clampPercent(pw.used_percent || 0),
-        resetsIn: resetDate ? formatResetTime(resetDate) : undefined,
-      })
+      windows.push(toWindow(data.rate_limit.primary_window, "5h"))
     }
-
     if (data.rate_limit?.secondary_window) {
-      const sw = data.rate_limit.secondary_window
-      const resetDate = sw.reset_at ? new Date(sw.reset_at * 1000) : undefined
-      const durationMs =
-        typeof sw.limit_window_seconds === "number"
-          ? sw.limit_window_seconds * 1000
-          : undefined
-      windows.push({
-        label: getWindowLabel(durationMs, "Week"),
-        usedPercent: clampPercent(sw.used_percent || 0),
-        resetsIn: resetDate ? formatResetTime(resetDate) : undefined,
-      })
+      windows.push(toWindow(data.rate_limit.secondary_window, "Week"))
     }
 
     return { provider: providerLabel, windows, fetchedAt: Date.now() }
   } catch (e) {
-    return {
-      provider: providerLabel,
-      windows: [],
-      error: String(e),
-      fetchedAt: Date.now(),
-    }
+    return usageError(providerLabel, String(e))
   }
 }
 
 async function fetchGeminiUsage(): Promise<UsageSnapshot> {
   const token = getGeminiToken()
   if (!token) {
-    return {
-      provider: "Gemini",
-      windows: [],
-      error: "no-auth",
-      fetchedAt: Date.now(),
-    }
+    return usageError("Gemini", "no-auth")
   }
 
   try {
@@ -628,12 +573,7 @@ async function fetchGeminiUsage(): Promise<UsageSnapshot> {
     )
 
     if (!res.ok) {
-      return {
-        provider: "Gemini",
-        windows: [],
-        error: `HTTP ${res.status}`,
-        fetchedAt: Date.now(),
-      }
+      return usageError("Gemini", `HTTP ${res.status}`)
     }
 
     const data = (await res.json()) as any
@@ -675,12 +615,7 @@ async function fetchGeminiUsage(): Promise<UsageSnapshot> {
 
     return { provider: "Gemini", windows, fetchedAt: Date.now() }
   } catch (e) {
-    return {
-      provider: "Gemini",
-      windows: [],
-      error: String(e),
-      fetchedAt: Date.now(),
-    }
+    return usageError("Gemini", String(e))
   }
 }
 
@@ -695,12 +630,7 @@ async function fetchMinimaxUsage(
       : "https://api.minimax.io/v1/api/openplatform/coding_plan/remains"
 
   if (!token) {
-    return {
-      provider: providerLabel,
-      windows: [],
-      error: "no-auth",
-      fetchedAt: Date.now(),
-    }
+    return usageError(providerLabel, "no-auth")
   }
 
   try {
@@ -713,23 +643,16 @@ async function fetchMinimaxUsage(
     })
 
     if (!res.ok) {
-      return {
-        provider: providerLabel,
-        windows: [],
-        error: `HTTP ${res.status}`,
-        fetchedAt: Date.now(),
-      }
+      return usageError(providerLabel, `HTTP ${res.status}`)
     }
 
     const data = (await res.json()) as any
     const baseResp = data?.base_resp
     if (baseResp?.status_code && baseResp.status_code !== 0) {
-      return {
-        provider: providerLabel,
-        windows: [],
-        error: baseResp.status_msg || `API ${baseResp.status_code}`,
-        fetchedAt: Date.now(),
-      }
+      return usageError(
+        providerLabel,
+        baseResp.status_msg || `API ${baseResp.status_code}`
+      )
     }
 
     const remains = Array.isArray(data?.model_remains) ? data.model_remains : []
@@ -747,64 +670,49 @@ async function fetchMinimaxUsage(
       remains[0]
 
     if (!textBucket) {
-      return {
-        provider: providerLabel,
-        windows: [],
-        error: "no-usage-data",
-        fetchedAt: Date.now(),
-      }
+      return usageError(providerLabel, "no-usage-data")
     }
 
     const windows: RateWindow[] = []
 
-    const intervalTotal = Number(textBucket.current_interval_total_count) || 0
-    const intervalRemaining =
-      Number(textBucket.current_interval_usage_count) || 0
-    if (intervalTotal > 0) {
-      const used = intervalTotal - intervalRemaining
-      const usedPercent = clampPercent((used / intervalTotal) * 100)
-      const resetDate = textBucket.end_time
-        ? new Date(Number(textBucket.end_time))
-        : undefined
-      const durationMs =
-        textBucket.start_time && textBucket.end_time
-          ? Number(textBucket.end_time) - Number(textBucket.start_time)
-          : undefined
+    // MiniMax's `*_usage_count` fields hold the remaining count, not the used one.
+    const addWindow = (
+      totalCount: unknown,
+      remainingCount: unknown,
+      start: unknown,
+      end: unknown,
+      fallbackLabel: string
+    ) => {
+      const total = Number(totalCount) || 0
+      if (total <= 0) return
+      const used = total - (Number(remainingCount) || 0)
       windows.push({
-        label: getWindowLabel(durationMs, "5h"),
-        usedPercent,
-        resetsIn: resetDate ? formatResetTime(resetDate) : undefined,
+        label: getWindowLabel(
+          start && end ? Number(end) - Number(start) : undefined,
+          fallbackLabel
+        ),
+        usedPercent: clampPercent((used / total) * 100),
+        resetsIn: end ? formatResetTime(new Date(Number(end))) : undefined,
       })
     }
-
-    const weeklyTotal = Number(textBucket.current_weekly_total_count) || 0
-    const weeklyRemaining = Number(textBucket.current_weekly_usage_count) || 0
-    if (weeklyTotal > 0) {
-      const used = weeklyTotal - weeklyRemaining
-      const usedPercent = clampPercent((used / weeklyTotal) * 100)
-      const resetDate = textBucket.weekly_end_time
-        ? new Date(Number(textBucket.weekly_end_time))
-        : undefined
-      const durationMs =
-        textBucket.weekly_start_time && textBucket.weekly_end_time
-          ? Number(textBucket.weekly_end_time) -
-            Number(textBucket.weekly_start_time)
-          : undefined
-      windows.push({
-        label: getWindowLabel(durationMs, "Week"),
-        usedPercent,
-        resetsIn: resetDate ? formatResetTime(resetDate) : undefined,
-      })
-    }
+    addWindow(
+      textBucket.current_interval_total_count,
+      textBucket.current_interval_usage_count,
+      textBucket.start_time,
+      textBucket.end_time,
+      "5h"
+    )
+    addWindow(
+      textBucket.current_weekly_total_count,
+      textBucket.current_weekly_usage_count,
+      textBucket.weekly_start_time,
+      textBucket.weekly_end_time,
+      "Week"
+    )
 
     return { provider: providerLabel, windows, fetchedAt: Date.now() }
   } catch (e) {
-    return {
-      provider: providerLabel,
-      windows: [],
-      error: String(e),
-      fetchedAt: Date.now(),
-    }
+    return usageError(providerLabel, String(e))
   }
 }
 
@@ -838,12 +746,7 @@ async function fetchUsageForProvider(provider: string): Promise<UsageSnapshot> {
     case "minimax-cn":
       return fetchMinimaxUsage("minimax-cn")
     default:
-      return {
-        provider: "Unknown",
-        windows: [],
-        error: "unknown-provider",
-        fetchedAt: Date.now(),
-      }
+      return usageError("Unknown", "unknown-provider")
   }
 }
 
@@ -939,29 +842,18 @@ export default function (pi: ExtensionAPI) {
     const sep = " " + dim(">") + " "
     const USAGE_BAR_WIDTH = 10
 
-    // Build the full single-line version first
-    const parts: string[] = [theme.fg("accent", usage.provider)]
-    for (const w of usage.windows) {
+    const windowParts = usage.windows.map((w) => {
       const bar = renderUsageBar(w.usedPercent, USAGE_BAR_WIDTH, theme)
       const pct = dim(`${Math.round(w.usedPercent)}%`)
       const timeStr = w.resetsIn ? " " + dim(w.resetsIn) : ""
-      parts.push(`${dim(w.label)} ${bar} ${pct}${timeStr}`)
-    }
-    const fullLine = parts.join(sep)
+      return `${dim(w.label)} ${bar} ${pct}${timeStr}`
+    })
 
-    if (visibleWidth(fullLine) <= width) {
-      return [fullLine]
-    }
-
-    // Doesn't fit — one line per window
-    const lines: string[] = []
-    for (const w of usage.windows) {
-      const bar = renderUsageBar(w.usedPercent, USAGE_BAR_WIDTH, theme)
-      const pct = dim(`${Math.round(w.usedPercent)}%`)
-      const timeStr = w.resetsIn ? " " + dim(w.resetsIn) : ""
-      lines.push(`${dim(w.label)} ${bar} ${pct}${timeStr}`)
-    }
-    return lines
+    // One line when it fits, otherwise one line per window
+    const fullLine = [theme.fg("accent", usage.provider), ...windowParts].join(
+      sep
+    )
+    return visibleWidth(fullLine) <= width ? [fullLine] : windowParts
   }
 
   function getThinkingLevel(ctx: any): string {
@@ -1024,6 +916,12 @@ export default function (pi: ExtensionAPI) {
       tuiRef?.requestRender()
     }
 
+    refreshUsage(provider)
+  }
+
+  /** Fetch fresh usage; a failed fetch does not replace cached windows. */
+  function refreshUsage(provider: string): void {
+    const cached = usageCache.get(provider)
     fetchUsageForProvider(provider)
       .then((u) => {
         if (!u || activeProvider !== provider) return
@@ -1038,20 +936,7 @@ export default function (pi: ExtensionAPI) {
   function startRefreshTimer(): void {
     if (refreshTimer) clearInterval(refreshTimer)
     refreshTimer = setInterval(() => {
-      if (activeProvider) {
-        const provider = activeProvider
-        const cached = usageCache.get(provider)
-        fetchUsageForProvider(provider)
-          .then((u) => {
-            if (!u || activeProvider !== provider) return
-            if (u.windows.length === 0 && u.error && cached?.windows.length)
-              return
-            usageCache.set(provider, u)
-            latestUsage = u
-            tuiRef?.requestRender()
-          })
-          .catch(() => {})
-      }
+      if (activeProvider) refreshUsage(activeProvider)
     }, USAGE_REFRESH_INTERVAL)
   }
 
