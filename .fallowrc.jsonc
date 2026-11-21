@@ -4,7 +4,9 @@
   "entry": [
     "extensions/*/index.ts",
     "extensions/*.ts",
-    "extensions/**/*.test.ts"
+    "extensions/**/*.test.ts",
+    // Manual smoke test, run with `bun extensions/pi-web-tools/fetch/test-handlers.ts`.
+    "extensions/pi-web-tools/fetch/test-handlers.ts"
   ],
   // Untracked checkouts of other repos that live inside this working copy.
   "ignorePatterns": [
@@ -21,6 +23,11 @@
   ],
   // Installed outside package.json (mise, system).
   "ignoreBinaries": ["biome", "jj"],
+  "duplicates": {
+    // pi-footer and pi-better-prompt-editor each keep their own copy of the
+    // extension status-row formatter, so neither imports from the other.
+    "ignoredClones": ["dup:a1fe35f5:2"]
+  },
   "workspaces": {
     // These package.json files only set `"type": "module"`; the dependencies
     // are declared in the root package.json.
