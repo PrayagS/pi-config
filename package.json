@@ -45,7 +45,8 @@
       "./extensions/pi-truncated-thinking-marker.ts",
       "./extensions/zzz-system-prompt-filter/index.ts",
       "./extensions/anthropic-stall-probe/index.ts",
-      "./extensions/mpl/index.ts"
+      "./extensions/mpl/index.ts",
+      "./extensions/pi-agy-acp/index.ts"
     ],
     "skills": [
       "./skills"
@@ -68,7 +69,8 @@
     "test:co-authored-by": "bun test extensions/pi-co-authored-by/index.test.ts",
     "test:output-style": "bun test extensions/output-style/index.test.ts",
     "test:anthropic-stall-probe": "node --test extensions/anthropic-stall-probe/probe.test.ts",
-    "test:mpl": "node --test extensions/mpl/mpl.test.ts extensions/mpl/display.test.ts"
+    "test:mpl": "node --test extensions/mpl/mpl.test.ts extensions/mpl/display.test.ts",
+    "test:pi-agy-acp": "node --test extensions/pi-agy-acp/tests/*.test.ts"
   },
   "dependencies": {
     "defuddle": "^0.18.1",

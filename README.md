@@ -41,6 +41,7 @@ pi -e git:github.com/PrayagS/pi-config
 - `extensions/pi-images/` — image attachments with kitty graphics preview ([credits](extensions/pi-images/README.md#credits))
 - `extensions/zzz-system-prompt-filter/` — system prompt filtering
 - `extensions/mpl/` — codemode-only `mpl_render` tool for matplotlib-style PNG/SVG charts ([credits](extensions/mpl/README.md))
+- `extensions/pi-agy-acp/` — `antigravity-acp` provider via the local `agy` CLI with Pi-owned tool execution, session persistence, and hardcoded 1M model specs ([README](extensions/pi-agy-acp/README.md))
 
 ### Experimental
 
