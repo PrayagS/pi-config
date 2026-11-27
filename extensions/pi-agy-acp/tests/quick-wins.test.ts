@@ -4,6 +4,7 @@ import {
   ModelCatalog,
   resolveAcpModelSelection,
 } from '../src/catalog.ts'
+import { toTokenUsage } from '../src/conversation.ts'
 import { HARDCODED_MODELS, modelSpecFor } from '../src/models.ts'
 import {
   replayPrompt,
@@ -413,5 +414,81 @@ describe('Hardcoded model configuration and 1M context window', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('toTokenUsage prompt-bucket normalization', () => {
+  it('scales cumulative multi-step prompt buckets to totalTokens so Pi does not falsely trigger silent overflow', () => {
+    const result = toTokenUsage(
+      {
+        inputTokens: 39_427,
+        cachedReadTokens: 977_776,
+        outputTokens: 12_715,
+        thoughtTokens: 4_385,
+      },
+      27,
+      { contextTokens: 94_936 },
+    )
+    assert.ok(result)
+    assert.equal(result.totalTokens, 94_936)
+    assert.equal(result.outputTokens, 12_715)
+    assert.equal(result.reasoningTokens, 4_385)
+    const promptSum = result.inputTokens + (result.cacheReadTokens ?? 0)
+    assert.equal(promptSum, 94_936)
+    assert.ok(
+      promptSum < 1_000_000,
+      'input + cacheRead must stay below 1M context window',
+    )
+    // Cache hit ratio (~96.12%) is preserved.
+    const ratio = (result.cacheReadTokens ?? 0) / promptSum
+    assert.ok(ratio > 0.96 && ratio < 0.965, `unexpected cache ratio: ${ratio}`)
+  })
+
+  it('leaves single-step prompt buckets untouched when already within totalTokens', () => {
+    const result = toTokenUsage(
+      {
+        inputTokens: 12_000,
+        cachedReadTokens: 80_000,
+        cachedWriteTokens: 1_500,
+        outputTokens: 3_000,
+      },
+      1,
+    )
+    assert.deepEqual(result, {
+      inputTokens: 12_000,
+      outputTokens: 3_000,
+      cacheReadTokens: 80_000,
+      cacheWriteTokens: 1_500,
+      totalTokens: 96_500,
+    })
+  })
+
+  it('still exceeds contextWindow when single-call occupancy genuinely overflows', () => {
+    const result = toTokenUsage(
+      {
+        inputTokens: 100_000,
+        cachedReadTokens: 2_400_000,
+        outputTokens: 1_000,
+      },
+      5,
+      { contextTokens: 1_050_000 },
+    )
+    assert.ok(result)
+    assert.equal(result.totalTokens, 1_050_000)
+    assert.equal(result.inputTokens + (result.cacheReadTokens ?? 0), 1_050_000)
+  })
+
+  it('bounds prompt buckets to fallback totalTokens when usage_update is absent', () => {
+    const result = toTokenUsage(
+      {
+        inputTokens: 50_000,
+        cachedReadTokens: 1_200_000,
+        outputTokens: 5_000,
+      },
+      10,
+    )
+    assert.ok(result)
+    assert.equal(result.totalTokens, 130_000)
+    assert.equal(result.inputTokens + (result.cacheReadTokens ?? 0), 130_000)
   })
 })

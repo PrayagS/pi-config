@@ -622,16 +622,18 @@ function accumulateRawUsage(
 /**
  * Map accumulated ACP turn usage into Pi token usage.
  *
- * Consumption buckets (`inputTokens`, `outputTokens`, `cacheReadTokens`,
- * `cacheWriteTokens`, `reasoningTokens`) stay unscaled cumulative turn totals
- * because intermediate `toolUse` steps emit zero usage and Pi sums those
- * buckets across steps for session accounting and flat pricing overrides.
- *
  * `totalTokens` feeds Pi's `calculateContextTokens` / ContextMeter / compaction
  * threshold as final-call context occupancy: when `options.contextTokens`
  * (from live `usage_update.used`) is positive, it is used directly; otherwise
  * final-segment prompt buckets are normalized by `calls` and added to final-
  * segment output tokens.
+ *
+ * Prompt buckets (`inputTokens`, `cacheReadTokens`, `cacheWriteTokens`) are
+ * proportionally scaled down whenever their cumulative multi-step sum exceeds
+ * `totalTokens`. Pi's `isContextOverflow()` sums `usage.input + usage.cacheRead`
+ * directly against `contextWindow` (ignoring `totalTokens`) on `stop` responses,
+ * so leaving cumulative multi-step prompt totals unscaled would falsely trigger
+ * silent-overflow compaction on long tool-calling turns.
  *
  * `agy acp` reports `inputTokens` as uncached input only, disjoint from
  * `cachedReadTokens` and `cachedWriteTokens`.
@@ -646,9 +648,9 @@ export function toTokenUsage(
   options?: TokenUsageOptions,
 ): TokenUsage | undefined {
   if (usage === undefined) return undefined
-  const input = Math.max(0, Math.round(usage.inputTokens ?? 0))
-  const cacheRead = Math.max(0, Math.round(usage.cachedReadTokens ?? 0))
-  const cacheWrite = Math.max(0, Math.round(usage.cachedWriteTokens ?? 0))
+  let input = Math.max(0, Math.round(usage.inputTokens ?? 0))
+  let cacheRead = Math.max(0, Math.round(usage.cachedReadTokens ?? 0))
+  let cacheWrite = Math.max(0, Math.round(usage.cachedWriteTokens ?? 0))
   const output = Math.max(0, Math.round(usage.outputTokens ?? 0))
   const reasoning =
     usage.thoughtTokens !== undefined && usage.thoughtTokens > 0
@@ -683,6 +685,26 @@ export function toTokenUsage(
     )
     const segOutput = Math.max(0, Math.round(seg.outputTokens ?? 0))
     totalTokens = segPrompt + segOutput
+  }
+  const promptSum = input + cacheRead + cacheWrite
+  if (promptSum > totalTokens) {
+    const rawInput = input
+    const rawCacheRead = cacheRead
+    const rawCacheWrite = cacheWrite
+    const scale = totalTokens / promptSum
+    input = Math.floor(rawInput * scale)
+    cacheRead = Math.floor(rawCacheRead * scale)
+    cacheWrite = Math.floor(rawCacheWrite * scale)
+    const remainder = totalTokens - (input + cacheRead + cacheWrite)
+    if (remainder > 0) {
+      if (rawCacheRead >= rawInput && rawCacheRead >= rawCacheWrite) {
+        cacheRead += remainder
+      } else if (rawInput >= rawCacheWrite) {
+        input += remainder
+      } else {
+        cacheWrite += remainder
+      }
+    }
   }
   return {
     inputTokens: input,

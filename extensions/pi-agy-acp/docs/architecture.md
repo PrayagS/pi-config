@@ -241,14 +241,19 @@ Working directory is `<PI_AGY_HOME>/workspace`. ACP JSON-RPC timeouts:
 ### Usage and `totalTokens` priority
 
 `toTokenUsage()` emits usage only when `session/prompt` includes a `usage`
-object. Cumulative buckets (`inputTokens`, `outputTokens`, `cacheReadTokens`,
-`cacheWriteTokens`, `reasoningTokens`) sum across `max_tokens` continuations;
+object. Output and reasoning buckets sum across `max_tokens` continuations;
 `totalTokens` resolves in priority order:
 
 1. Positive `usage_update.used` from the current continuation segment.
 2. Positive `estimated_tokens_used` from `gen_metadata` in the current segment.
 3. Final-segment average fallback:
    `round((input + cacheRead + cacheWrite) / max(1, segmentCalls)) + round(output)`.
+
+When cumulative multi-step prompt buckets (`inputTokens + cacheReadTokens +
+cacheWriteTokens`) exceed `totalTokens`, they are proportionally scaled down to
+fit `totalTokens` (preserving cache hit ratios) so Pi's `isContextOverflow()`
+(`usage.input + usage.cacheRead > contextWindow`) does not falsely compact long
+tool-calling turns.
 
 ## Quota reader and Pi stream contracts
 

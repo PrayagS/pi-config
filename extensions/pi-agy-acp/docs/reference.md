@@ -194,9 +194,11 @@ whenever `session/prompt` reports usage.
 The extension separates cumulative turn consumption from final-call context
 occupancy:
 
-- `input`, `output`, `cacheRead`, `cacheWrite`, and `reasoning` preserve
-  unscaled cumulative turn totals, so Pi session totals and flat pricing
-  overrides reflect full multi-step consumption.
+- `output` and `reasoning` preserve cumulative turn totals; prompt buckets
+  (`input`, `cacheRead`, `cacheWrite`) stay unscaled when within `totalTokens`
+  and are proportionally scaled to `totalTokens` on multi-step turns (preserving
+  cache hit ratios) so Pi's silent-overflow check (`input + cacheRead >
+  contextWindow`) does not falsely compact long tool-calling turns.
 - `totalTokens` (feeding Pi's context meter and auto-compaction threshold) uses
   the final call's live token occupancy when reported by `agy`, falling back to
   the same turn's session metadata estimate and then a final-segment average
