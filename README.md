@@ -4,7 +4,60 @@ Opinionated [Pi](https://github.com/badlogic/pi-mono/tree/main/packages/coding-a
 
 Personal workflow repo. Expect sharp edges and occasional breaking changes.
 
-## Install
+## Bootstrap my Pi profile
+
+With Pi and mise installed, clone this repo to `~/dev/pi-config` and run:
+
+```sh
+mise -C ~/dev/pi-config bootstrap
+```
+
+This fills missing keys in `~/.pi/agent/settings.json` from `profile/settings.json`.
+Existing values and arrays, including the `packages` list, are not overwritten.
+Pi's changes to `settings.json` stay in the live file; the npm watcher below
+can capture package changes selectively. The other tracked profile files, patch
+script, and `AGENTS.md` are symlinks.
+
+Bootstrap then runs `pi update --extensions` for the user profile, followed by
+the repo's `patch-minimal-subagents.mjs` if the update succeeds. Keep credentials
+and runtime state out of `profile/`.
+
+The shipped settings load this checkout as a local Pi package. Use the checkout
+path above, or adjust the package path in your live settings. Local package
+runtime dependencies are managed separately with `aube install`.
+
+### Watch Pi's npm packages
+
+After bootstrapping the merge-based profile, start a report-only watcher:
+
+```sh
+mise -C ~/dev/pi-config -E package-watch run pi:packages:watch
+```
+
+The first run records a local baseline; it does not treat packages already
+absent on this machine as deletions. Later runs report npm additions, removals,
+and declaration edits. To capture the reported changes, run
+`mise -C ~/dev/pi-config run pi:packages:capture`. For continuous capture in a
+foreground watcher, set `PI_PACKAGE_SYNC_APPLY=1` when starting it.
+
+The task writes only the observed npm changes to `profile/settings.json`. It
+doesn't copy other settings, local checkout paths, or state, and never commits
+or pushes. If the repo's npm list was edited independently, review both lists
+before running `mise -C ~/dev/pi-config run pi:packages:reset-baseline` to accept
+them as the new baseline without copying either. The watcher refuses to read
+live settings through a symlink; migrate the profile first.
+
+The optional login service captures changes automatically. It updates the
+working copy only; review and commit the changes with your normal work. With
+mise installed at `~/.local/bin/mise`, opt in on this machine with:
+
+```sh
+mise -C ~/dev/pi-config -E package-watch bootstrap --only tools,services
+```
+
+Its log is under `${XDG_STATE_HOME:-$HOME/.local/state}/pi-config/package-watch.log`.
+
+## Install just the package
 
 Install package from git:
 

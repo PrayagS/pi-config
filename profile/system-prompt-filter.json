@@ -1,0 +1,32 @@
+{
+  "rules": [
+    {
+      "id": "movivujtqkii",
+      "name": "Pass the optional `project` parameter to limit sea",
+      "type": "string",
+      "pattern": "- Pass the optional `project` parameter to limit search to a single project — use a substring of the project path or slug (e.g. 'pi-session-search').\n",
+      "enabled": true
+    },
+    {
+      "id": "movivujt8lfo",
+      "name": "Capture new multi-step requirements early and keep",
+      "type": "string",
+      "pattern": "- Capture new multi-step requirements early and keep the session task list current.\n",
+      "enabled": true
+    },
+    {
+      "id": "movivujti9fe",
+      "name": "Set a task to in_progress before substantial work ",
+      "type": "string",
+      "pattern": "- Set a task to in_progress before substantial work begins.\n",
+      "enabled": true
+    },
+    {
+      "id": "movivujtqshf",
+      "name": "Call task_list after completing a task to pick the",
+      "type": "string",
+      "pattern": "- Call task_list after completing a task to pick the next ready item.\n",
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "showThroughput": true,
+  "showLatency": true,
+  "measurementMode": "e2e",
+  "displayMode": "pill",
+  "iconSet": "nerd"
+}

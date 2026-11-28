@@ -1,0 +1,57 @@
+[dotfiles]
+# Pi owns the live settings file, including the package list and device ID.
+"~/.pi/agent/settings.json/defaults" = { source = "profile/settings.json", merge = "missing", permissions = "0600" }
+
+# Keep the remaining profile files linked to the repo.
+"~/.pi/agent/keybindings.json" = { source = "profile/keybindings.json", mode = "symlink" }
+"~/.pi/agent/advisor.json" = { source = "profile/advisor.json", mode = "symlink" }
+"~/.pi/agent/antigravity-acp.json" = { source = "profile/antigravity-acp.json", mode = "symlink" }
+"~/.pi/agent/context-prune/settings.json" = { source = "profile/context-prune/settings.json", mode = "symlink" }
+"~/.pi/agent/hide-providers.json" = { source = "profile/hide-providers.json", mode = "symlink" }
+"~/.pi/agent/pi-cachemire.json" = { source = "profile/pi-cachemire.json", mode = "symlink" }
+"~/.pi/agent/pi-checklist.json" = { source = "profile/pi-checklist.json", mode = "symlink" }
+"~/.pi/agent/pi-fff.json" = { source = "profile/pi-fff.json", mode = "symlink" }
+"~/.pi/agent/pi-gauge.json" = { source = "profile/pi-gauge.json", mode = "symlink" }
+"~/.pi/agent/pi-meantime.json" = { source = "profile/pi-meantime.json", mode = "symlink" }
+"~/.pi/agent/pi-traceline.json" = { source = "profile/pi-traceline.json", mode = "symlink" }
+"~/.pi/agent/sandbox.json" = { source = "profile/sandbox.json", mode = "symlink" }
+"~/.pi/agent/session-summary.json" = { source = "profile/session-summary.json", mode = "symlink" }
+"~/.pi/agent/system-prompt-filter.json" = { source = "profile/system-prompt-filter.json", mode = "symlink" }
+"~/.pi/agent/tools-disabled.json" = { source = "profile/tools-disabled.json", mode = "symlink" }
+"~/.pi/agent/patches/patch-minimal-subagents.mjs" = { source = "profile/patches/patch-minimal-subagents.mjs", mode = "symlink" }
+"~/.pi/agent/AGENTS.md" = { source = "GLOBAL_AGENTS.md", mode = "symlink" }
+
+[tasks.bootstrap]
+description = "Update global Pi packages and apply the minimal-subagents patch"
+run = '''
+PI_CODING_AGENT_DIR="$HOME/.pi/agent" pi update --extensions --no-approve &&
+  node profile/patches/patch-minimal-subagents.mjs
+'''
+
+[tasks."pi:packages:sync"]
+description = "Report or capture observed changes to the live npm package list"
+run = "node scripts/pi-package-sync.mjs"
+
+[tasks."pi:packages:capture"]
+description = "Capture observed npm package changes into the profile"
+run = "node scripts/pi-package-sync.mjs --apply"
+
+[tasks."pi:packages:reset-baseline"]
+description = "Accept the current live and repo npm lists without copying either"
+run = "node scripts/pi-package-sync.mjs --reset-baseline"
+
+[tasks."pi:packages:watch"]
+description = "Watch live Pi settings for npm package changes"
+run = '''
+set -eu
+if [ "${PI_PACKAGE_SYNC_LOG:-0}" = 1 ]; then
+  umask 077
+  state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/pi-config"
+  mkdir -p "$state_dir"
+  exec >> "$state_dir/package-watch.log" 2>&1
+fi
+mise_bin=$(command -v mise || printf '%s\n' "$HOME/.local/bin/mise")
+exec "$mise_bin" watch --project-origin "$HOME" --no-discover-ignore \
+  --watch-non-recursive "$HOME/.pi/agent" --filter '/.pi/agent/settings.json' \
+  --debounce 250ms --on-busy-update queue pi:packages:sync
+'''

@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "showPruneStatusLine": true,
+  "showStartupNotice": true,
+  "summarizerModel": "openai-codex/gpt-6-luna",
+  "summarizerThinking": "low",
+  "pruneOn": "agent-message",
+  "remindUnprunedCount": true,
+  "notifySkipped": true,
+  "batchingMode": "turn",
+  "minRawCharsThreshold": 600,
+  "manualPruneConcurrency": 16
+}

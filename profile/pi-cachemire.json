@@ -1,0 +1,8 @@
+{
+  "widget": false,
+  "turnSummary": true,
+  "turnSummaryMinCalls": 1,
+  "missWarnings": true,
+  "missWarnUsd": 0.05,
+  "missWarnTokens": 20000
+}

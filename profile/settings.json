@@ -1,0 +1,275 @@
+{
+  "vimEditor": {
+    "clipboard": "unnamedplus"
+  },
+  "minimalSubagents": {
+    "enabled": true,
+    "maxSubagentDepth": 2,
+    "readToolset": [
+      "read",
+      "ls",
+      "ffgrep",
+      "fffind"
+    ],
+    "modifyToolset": [
+      "bash",
+      "edit",
+      "write"
+    ]
+  },
+  "httpIdleTimeoutMs": 45000,
+  "retry": {
+    "enabled": true,
+    "maxRetries": 3,
+    "baseDelayMs": 2000
+  },
+  "lastChangelogVersion": "1.6.1",
+  "defaultThinkingLevel": "high",
+  "defaultProjectTrust": "always",
+  "doubleEscapeAction": "tree",
+  "theme": "system",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.6-sol",
+  "shellCommandPrefix": "grep() { grg \"$@\"; }; find() { fnd \"$@\"; };",
+  "packages": [
+    {
+      "source": "npm:@plannotator/pi-extension",
+      "extensions": [
+        "+"
+      ],
+      "skills": [
+        "-skills/plannotator-annotate/SKILL.md",
+        "-skills/plannotator-last/SKILL.md",
+        "-skills/plannotator-review/SKILL.md",
+        "+skills/plannotator-visual-explainer/SKILL.md",
+        "+skills/plannotator-setup-goal/SKILL.md",
+        "+skills/plannotator/SKILL.md"
+      ]
+    },
+    {
+      "source": "../../dev/pi-extensions/pi-interlude",
+      "extensions": [
+        "+index.ts"
+      ]
+    },
+    {
+      "source": "npm:pi-token-usage",
+      "extensions": [
+        "+src/index.ts"
+      ]
+    },
+    {
+      "source": "../../dev/pi-config",
+      "extensions": [
+        "-extensions/supacode/index.ts",
+        "+extensions/input-history/index.ts",
+        "+extensions/fetch-url/index.ts",
+        "-extensions/web-search/index.ts",
+        "-extensions/sandbox/index.ts",
+        "+extensions/editor-border/index.ts",
+        "-extensions/pi-spawn-claude-code/index.ts",
+        "-extensions/custom-provider-bedrock-inference-profiles/index.ts",
+        "-extensions/pi-dcp/index.ts",
+        "-extensions/caveman/index.ts",
+        "+extensions/interactive-shell/index.ts",
+        "+extensions/pi-images/index.ts",
+        "-extensions/prewalk/index.ts",
+        "-extensions/qmd-sessions-indexer/index.ts",
+        "+extensions/pi-footer/index.ts",
+        "+extensions/pi-better-prompt-editor/index.ts",
+        "-extensions/questionnaire/index.ts",
+        "-extensions/notify/index.ts"
+      ],
+      "skills": [
+        "-skills/skill-creator/SKILL.md"
+      ]
+    },
+    "npm:pi-cache-graph",
+    "npm:pi-bash-trim",
+    {
+      "source": "npm:@baggiiiie/pi-context-chart",
+      "extensions": [
+        "+src/index.ts"
+      ]
+    },
+    {
+      "source": "npm:pi-model-selector-x",
+      "extensions": [
+        "+model-selector-x.ts"
+      ]
+    },
+    "npm:@ff-labs/pi-fff",
+    "npm:pi-model-sort",
+    "../../dev/pi-extensions/pi-queue-steer",
+    "../../dev/pi-extensions/agent-stuff/extensions/session-breakdown.ts",
+    {
+      "source": "npm:pine-of-glass",
+      "extensions": [
+        "+extensions/pi-contextimate/index.ts",
+        "-extensions/pi-traceline/index.ts"
+      ]
+    },
+    "../../dev/pi-extensions/pasky-pi-session-summary",
+    "npm:pi-vision-handoff",
+    "npm:pi-tool-duration",
+    "npm:pi-tick",
+    "npm:@howaboua/pi-gippity-control",
+    {
+      "source": "npm:@eko24ive/pi-ask",
+      "skills": [
+        "+skills/ask-user/SKILL.md"
+      ]
+    },
+    "npm:pi-anycopy",
+    "npm:pi-move-session",
+    "npm:pi-session-switch",
+    "npm:@ogulcancelik/pi-session-recall",
+    "npm:@ian-pascoe/pi-minimal-subagents",
+    {
+      "source": "../../dev/pstack-pi",
+      "skills": [
+        "+skills/setup-pstack/SKILL.md"
+      ]
+    },
+    "npm:@tifan/pi-inline-skills",
+    {
+      "source": "npm:@monotykamary/pi-better-grok",
+      "extensions": [
+        "-index.ts"
+      ]
+    },
+    "npm:pi-hide-providers",
+    "../../dev/pi-extensions/pi-draw",
+    "npm:pi-gauge",
+    "npm:pi-checklist",
+    {
+      "source": "npm:@tallshort/pi-context-prune-manual-plus",
+      "extensions": [
+        "-dist/index.js"
+      ]
+    },
+    "npm:@monotykamary/pi-better-openai",
+    "npm:pi-vim-editor",
+    "npm:@zigai/pi-tree",
+    "../../dev/pi-extensions/pi-rex-shell"
+  ],
+  "images": {
+    "blockImages": false
+  },
+  "quietStartup": false,
+  "hideThinkingBlock": true,
+  "collapseChangelog": false,
+  "enabledModels": [
+    "anthropic/claude-opus-5-5",
+    "openai-codex/gpt-6-luna",
+    "anthropic/claude-sonnet-5-5",
+    "anthropic/claude-haiku-5-5",
+    "antigravity-acp/gemini-4-neon",
+    "antigravity-acp/gemini-4-argon",
+    "antigravity-acp/claude-opus-5-5",
+    "antigravity-acp/gemini-4-carbon",
+    "antigravity-acp/claude-sonnet-5-5",
+    "antigravity-acp/gemini-4-hydrogen",
+    "antigravity-acp/gpt-oss-120b-medium",
+    "antigravity-acp/gemini-pro-orchestrator-neon",
+    "antigravity-acp/gemini-pro-orchestrator-argon",
+    "openai-codex/gpt-6.2-sol",
+    "openai-codex/gpt-6.2-astra"
+  ],
+  "showHardwareCursor": true,
+  "treeFilterMode": "all",
+  "themes": [
+    "+themes/ghostty-sync-f4e5674f.json"
+  ],
+  "piExecutor": {
+    "autoStart": false
+  },
+  "terminal": {
+    "hyperlinks": true,
+    "images": "kitty",
+    "trueColor": true,
+    "showTerminalProgress": true
+  },
+  "transport": "auto",
+  "steeringMode": "all",
+  "followUpMode": "one-at-a-time",
+  "tasksMode": "open",
+  "splitEditor": {
+    "editor": "nvim",
+    "size": "50%",
+    "direction": "vertical",
+    "showIndicator": true
+  },
+  "extensions": [
+    "-builtin:llama.cpp"
+  ],
+  "skills": [
+    "+skills/helmor-cli/SKILL.md",
+    "-skills/codex-reset-credits/SKILL.md",
+    "-skills/caveman/SKILL.md",
+    "-skills/caveman-compress/SKILL.md",
+    "-skills/handoff/SKILL.md",
+    "-skills/improve-codebase-architecture/SKILL.md",
+    "-skills/learn-codebase/SKILL.md",
+    "-skills/logstore-service-logs/SKILL.md",
+    "-skills/obsidian-bases/SKILL.md",
+    "-skills/obsidian-markdown/SKILL.md",
+    "-skills/session-reader/SKILL.md",
+    "-skills/supacode-cli/SKILL.md",
+    "-skills/text-search/SKILL.md",
+    "-skills/visual-explainer/SKILL.md",
+    "-skills/domain-modeling/SKILL.md",
+    "+skills/research/SKILL.md",
+    "+skills/teach/SKILL.md",
+    "+skills/writing-great-skills/SKILL.md",
+    "+skills/subagents/SKILL.md",
+    "-skills/yaml-reader/SKILL.md",
+    "-skills/vcs/SKILL.md",
+    "-skills/ponytail-audit/SKILL.md",
+    "-skills/ponytail-review/SKILL.md",
+    "-skills/terminal-browser/SKILL.md",
+    "-skills/ast-grep/SKILL.md",
+    "-skills/codebase-design/SKILL.md",
+    "-skills/grill-me/SKILL.md",
+    "-skills/grilling/SKILL.md",
+    "-skills/build-persona/SKILL.md",
+    "-skills/feed-catchup/SKILL.md",
+    "-skills/now-reading-page/SKILL.md",
+    "-skills/quiz/SKILL.md",
+    "-skills/reader-recap/SKILL.md",
+    "-skills/readwise-cli/SKILL.md",
+    "-skills/surprise-me/SKILL.md"
+  ],
+  "markdown": {
+    "mermaid": "final"
+  },
+  "tuiMode": "fullscreen",
+  "fullscreenScrollbar": "always",
+  "editorPaddingX": 0,
+  "outputPad": 1,
+  "fullscreenCopyOnSelect": true,
+  "cacheWarming": "streaming",
+  "fullscreenWheelScrollLines": "auto",
+  "extensionChangelogVersions": {
+    "{\"source\":\"npm:pi-bash-trim\",\"scope\":\"user\"}": "1.0.2",
+    "{\"source\":\"npm:pi-model-selector-x\",\"scope\":\"user\"}": "0.3.0",
+    "{\"source\":\"../../dev/pi-extensions/pi-queue-steer\",\"scope\":\"user\"}": "0.2.2",
+    "{\"source\":\"npm:pine-of-glass\",\"scope\":\"user\"}": "0.18.4",
+    "{\"source\":\"npm:pi-tool-duration\",\"scope\":\"user\"}": "0.6.10",
+    "{\"source\":\"npm:pi-tick\",\"scope\":\"user\"}": "0.3.0",
+    "{\"source\":\"npm:@howaboua/pi-gippity-control\",\"scope\":\"user\"}": "0.0.36",
+    "{\"source\":\"npm:@eko24ive/pi-ask\",\"scope\":\"user\"}": "1.2.0",
+    "{\"source\":\"npm:pi-anycopy\",\"scope\":\"user\"}": "0.3.6",
+    "{\"source\":\"npm:@rahularya01/pi-cursor\",\"scope\":\"user\"}": "1.4.39",
+    "{\"source\":\"npm:@monotykamary/pi-better-openai\",\"scope\":\"user\"}": "0.3.11",
+    "{\"source\":\"npm:pi-stereo-view\",\"scope\":\"user\"}": "0.1.11",
+    "{\"source\":\"npm:pi-agy-acp\",\"scope\":\"user\"}": "0.2.3",
+    "{\"source\":\"npm:@firespoon/pi-antigravity-bridge\",\"scope\":\"user\"}": "1.10.16"
+  },
+  "notices": {
+    "cacheMisses": true,
+    "cacheWarming": true,
+    "compactionCosts": true,
+    "reasoningDrops": true
+  }
+}

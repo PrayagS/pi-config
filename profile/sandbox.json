@@ -1,0 +1,40 @@
+{
+  "enabled": true,
+  "enableWeakerNetworkIsolation": true,
+  "network": {
+    "allowLocalBinding": true,
+    "allowAllUnixSockets": true,
+    "allowedDomains": [
+      "*.npmjs.org",
+      "*.pypi.org",
+      "*.github.com",
+      "raw.githubusercontent.com",
+      "*.golang.org"
+    ],
+    "deniedDomains": []
+  },
+  "filesystem": {
+    "denyRead": [],
+    "allowRead": [
+      ".",
+      "~/.pi/**",
+      "~/.config/**",
+      "~/.local/**",
+      "~/Library/**",
+      "~/.cache/**",
+      "~/dev/pi-config/skills/**",
+      "~/dev/pi-config/extensions/caveman/caveman-compress/**",
+      "/opt/global-pre-commit-hooks-security/**"
+    ],
+    "allowWrite": [
+      ".",
+      "/tmp/**",
+      "~/dev/go/**",
+      "~/Library/Caches/**"
+    ],
+    "denyWrite": [
+      "~/.pi/agent/sandbox.json",
+      "**/.pi/sandbox.json"
+    ]
+  }
+}

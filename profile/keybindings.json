@@ -1,0 +1,16 @@
+{
+  "app.models.clearAll": [],
+  "tui.editor.deleteToLineEnd": [],
+  "tui.editor.yank": [],
+  "tui.input.newLine": ["enter", "shift+enter", "ctrl+y"],
+  "app.session.rename": [],
+  "app.message.copy": ["ctrl+y"],
+  "interlude": ["f6", "ctrl+x"],
+  "app.model.cycleForward": [],
+  "app.model.cycleBackward": [],
+  "tui.altScreen.previousPrompt": ["ctrl+p"],
+  "tui.altScreen.nextPrompt": ["ctrl+n"],
+  "tui.altScreen.halfPageUp": ["ctrl+u"],
+  "tui.altScreen.halfPageDown": ["ctrl+d"],
+  "tui.input.submit": ["super+enter", "ctrl+enter"]
+}

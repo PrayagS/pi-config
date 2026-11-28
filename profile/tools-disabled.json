@@ -1,0 +1,14 @@
+{
+  "disabledTools": [
+    "set_tab_title",
+    "sg",
+    "tick_create",
+    "tick_delete",
+    "tick_list",
+    "powershell",
+    "find",
+    "grep",
+    "openai_decide",
+    "openai_websearch"
+  ]
+}

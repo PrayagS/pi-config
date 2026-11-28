@@ -1,0 +1,12 @@
+# Opt-in login service. Capture npm changes locally without committing or pushing.
+[tools]
+node = "lts"
+watchexec = "latest"
+
+[bootstrap.services.pi-package-watch]
+description = "Capture changes to Pi's npm package list into the repo"
+scope = "user"
+command = "~/.local/bin/mise -E package-watch run pi:packages:watch"
+working_directory = "~/dev/pi-config"
+requires_tools = true
+environment = { PI_PACKAGE_SYNC_LOG = "1", PI_PACKAGE_SYNC_APPLY = "1" }
