@@ -119,10 +119,10 @@ export interface ReplayPromptOptions {
  * Static bridge instructions appended to the agent's system prompt.
  * @returns the static bridge preamble.
  */
-export function bridgeSystemPrompt(): string {
+export function bridgeSystemPrompt(nativeWrites = false): string {
   return [
     'You are the primary model of a Pi coding agent session. The harness owns the conversation, the tools, and their permissions.',
-    `Every harness tool is available to you under the prefix \`${AGENT_TOOL_PREFIX}\`: a tool named \`X\` in the harness instructions is the tool \`${AGENT_TOOL_PREFIX}X\`. If \`${AGENT_TOOL_PREFIX}X\` is absent from your direct tool declarations, invoke it via \`${AGENT_TOOL_PREFIX}${CALL_TOOL_NAME}\` with \`{"name":"X","arguments":{...}}\`. Use only these tools; pass arguments exactly as their schemas define.`,
+    `Every harness tool is available to you under the prefix \`${AGENT_TOOL_PREFIX}\`: a tool named \`X\` in the harness instructions is the tool \`${AGENT_TOOL_PREFIX}X\`. If \`${AGENT_TOOL_PREFIX}X\` is absent from your direct tool declarations, invoke it via \`${AGENT_TOOL_PREFIX}${CALL_TOOL_NAME}\` with \`{"name":"X","arguments":{...}}\`. ${nativeWrites ? 'Use Pi tools for reads and native agy file tools for edits and writes. Do not use another tool to work around a denied write.' : 'Use only these tools; pass arguments exactly as their schemas define.'}`,
     'When the first user message contains <system_instructions>, <harness_tool_instructions>, or <pi_history> blocks, treat <system_instructions> and <harness_tool_instructions> as harness instructions for the entire session and <pi_history> as the earlier part of this conversation; continue from the newest input after them without repeating completed actions.',
   ].join('\n')
 }

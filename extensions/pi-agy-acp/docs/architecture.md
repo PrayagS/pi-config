@@ -11,11 +11,13 @@ contributors working on `pi-agy-acp`. For setup and verification, start with
 The runtime launches `agy` with:
 
 ```text
-agy acp --gemini-dir <PI_AGY_HOME> --app-data-dir agy --agent pi-bridge \
-  --process-per-session --disable-telemetry --log-file <PI_AGY_HOME>/acp.log
+agy acp --gemini-dir <state-home> --app-data-dir agy --agent pi-bridge \
+  --process-per-session --disable-telemetry --log-file <state-home>/acp.log
 ```
 
-Working directory is `<PI_AGY_HOME>/workspace`. ACP JSON-RPC timeouts:
+The front process runs in `<state-home>/workspace`. In native-write mode the
+managed home has its own `native-writes` subdirectory and sessions use the
+canonical Pi launch directory as their workspace. ACP JSON-RPC timeouts:
 
 | Method | Timeout |
 | --- | --- |
@@ -33,7 +35,7 @@ Working directory is `<PI_AGY_HOME>/workspace`. ACP JSON-RPC timeouts:
   discovery (`warmup`) sessions pass `mcpServers: []`.
 - Clean turn completions record verified SQLite high-water marks
   `(steps, generations, executions)` and a SHA-256 prefix fingerprint in
-  `<PI_AGY_HOME>/session-index.json` (`src/session-store.ts`). On Pi restart,
+  `<state-home>/session-index.json` (`src/session-store.ts`). On Pi restart,
   idle wake, or tree rewind/branch:
   - Exact checkpoint matches reconnect directly via `session/resume` (falling
     back to `session/load`), preserving native conversation state and prompt
@@ -199,7 +201,7 @@ Working directory is `<PI_AGY_HOME>/workspace`. ACP JSON-RPC timeouts:
 
 ### Fail-closed permission policy
 
-- Isolated `<PI_AGY_HOME>/agy/settings.json` sets
+- Isolated `<state-home>/agy/settings.json` sets
   `toolPermission: 'request-review'` and `agentMode: ''`.
 - `session/request_permission` is fail-closed: `cancelled` before `session/new`
   completes (or on owner/tenant mismatch), and `reject_once` whenever no active
@@ -211,6 +213,12 @@ Working directory is `<PI_AGY_HOME>/workspace`. ACP JSON-RPC timeouts:
   `pi_await_result`/`pi_call_tool`). A narrow exception allows an identity-less
   `kind === 'other'` probe with empty input only after an MCP handshake on that
   tenant.
+- Native-write mode is the only exception for built-ins. It removes `edit` and
+  `write` from the bridge catalog and preserves their per-request availability
+  as an approval prerequisite. A grant also requires an allowlisted native
+  writer name, matching ACP tool call identity and target, and a canonical path
+  inside the workspace. Mutations remain agy-side; they do not invoke Pi's
+  write hooks. This is a permission broker, not an OS sandbox.
 
 ## Session SQLite telemetry and usage
 
@@ -218,7 +226,7 @@ Working directory is `<PI_AGY_HOME>/workspace`. ACP JSON-RPC timeouts:
 
 - Uses `node:sqlite` (`DatabaseSync`, `readOnly: true`, `timeout: 50`).
 - Validates `sessionId` (`[A-Za-z0-9._-]+`), verifies `realpath` containment
-  within `<PI_AGY_HOME>/agy/conversations`, and rejects symlinks or non-regular
+  within `<state-home>/agy/conversations`, and rejects symlinks or non-regular
   files across `.db`, `.db-wal`, `.db-shm`, and `.db-journal`.
 - Gates streaming reads with cached context window / positive `usage_update`
   checks and `(mtimeNs, size)` stamps across `.db`, `.db-wal`, and

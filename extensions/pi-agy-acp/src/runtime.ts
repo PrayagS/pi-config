@@ -8,8 +8,8 @@
  */
 
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { statSync } from 'node:fs'
-import { join } from 'node:path'
+import { realpathSync, statSync } from 'node:fs'
+import { isAbsolute, join } from 'node:path'
 import { LlmError } from './protocol.ts'
 import type {
   ContentBlock,
@@ -64,6 +64,8 @@ import {
   type BridgeTool,
   type BridgeToolResult,
 } from './mcp-bridge.ts'
+import type { NativeWriteActivityRecord } from './native-write-activity.ts'
+import { hostWriter, nativeWriteTarget } from './native-writes.ts'
 import {
   assertSupportedAgyVersion,
   binaryFingerprint,
@@ -117,6 +119,8 @@ export interface RuntimeHost {
   log: { info(message: string): void; warn(message: string): void }
   /** Notify catalog consumers that the model list changed. */
   onModelsChanged(): void
+  /** Report actual agy file activity without inserting a Pi tool call. */
+  onNativeWrite?(sessionId: string, activity: NativeWriteActivityRecord): void
   /** Delay before a parked tool call detaches via cancel-and-drain; overrides config.detachAfterMs (140s). */
   detachAfterMs?: number
   /** Maximum ms to wait for `session/cancel` or mid-turn steer acknowledgement; overrides config.cancelTimeoutMs (15s). */
@@ -172,6 +176,8 @@ interface Conversation {
   advertisedToolDigests: Map<string, string>
   knownTools: Map<string, string>
   toolNames: Set<string>
+  /** Host writer capabilities present in this request before native routing. */
+  nativeWriteTools: Set<string>
   /** Full uncompacted tool schemas for MCP boundary argument validation. */
   toolSchemas: Map<string, BridgeTool>
   /** Tool calls the agent reported via `session/update` — the only trusted permission source. */
@@ -238,13 +244,24 @@ export class AntigravityRuntime {
   private readonly shutdown = new AbortController()
   private disposal: Promise<void> | undefined
   private readonly host: RuntimeHost
+  private readonly nativeWriteRoot?: string
 
   /** @param host - host services. */
   constructor(host: RuntimeHost) {
     this.host = host
     this.monotonicNow = host.monotonicNow ?? (() => performance.now())
     this.lastSweepAt = this.monotonicNow()
-    this.home = host.config.home.length > 0 ? host.config.home : defaultHome()
+    const baseHome = host.config.home.length > 0 ? host.config.home : defaultHome()
+    const root = host.config.nativeWriteRoot
+    if (root !== undefined) {
+      if (!isAbsolute(root))
+        throw new Error('Native agy writes require an absolute workspace path')
+      this.nativeWriteRoot = realpathSync(root)
+      if (!statSync(this.nativeWriteRoot).isDirectory())
+        throw new Error('Native agy writes require a workspace directory')
+    }
+    // Don't reuse the bridge-only agent config, permissions, or latched sessions.
+    this.home = root === undefined ? baseHome : join(baseHome, 'native-writes')
     this.sessionStore = new SessionStore(this.home)
     this.catalog = new ModelCatalog(
       join(this.home, 'catalog.json'),
@@ -707,7 +724,12 @@ export class AntigravityRuntime {
         conv.lastUsed = this.monotonicNow()
         conv.idleMs = 0
         const split = splitSystem(options)
-        const tools = toBridgeTools(options.tools)
+        let tools = toBridgeTools(options.tools)
+        if (this.nativeWriteRoot !== undefined) {
+          split.system += `\n\nUse native agy file tools instead of Pi edit/write for writes in ${this.nativeWriteRoot}. Use Pi tools for reads.`
+          conv.nativeWriteTools = new Set(tools.map((tool) => tool.name))
+          tools = tools.filter((tool) => tool.name !== 'edit' && tool.name !== 'write')
+        }
         conv.toolNames = new Set(tools.map((t) => t.name))
         conv.toolSchemas = new Map(tools.map((t) => [t.name, t]))
         const requestedEffort =
@@ -920,6 +942,7 @@ export class AntigravityRuntime {
       advertisedToolDigests: new Map(),
       knownTools: new Map(),
       toolNames: new Set(),
+      nativeWriteTools: new Set(),
       toolSchemas: new Map(),
       reportedToolCalls: new Map(),
       opening: false,
@@ -1014,6 +1037,7 @@ export class AntigravityRuntime {
         undefined,
         warn,
         this.sessionStore.sessionIds(),
+        this.nativeWriteRoot !== undefined,
       )
       return Promise.resolve(this.preflight)
     }
@@ -1030,6 +1054,7 @@ export class AntigravityRuntime {
         undefined,
         warn,
         this.sessionStore.sessionIds(),
+        this.nativeWriteRoot !== undefined,
       )
       const result: PreflightResult = {
         binary,
@@ -1110,12 +1135,12 @@ export class AntigravityRuntime {
     try {
       const result = await proc.newSession(
         {
-          cwd: this.preflight?.workspace ?? this.home,
+          cwd: this.nativeWriteRoot ?? this.preflight?.workspace ?? this.home,
           mcpServers,
           _meta: {
             antigravity: {
               systemPrompt: {
-                append: bridgeSystemPrompt(),
+                append: bridgeSystemPrompt(this.nativeWriteRoot !== undefined),
               },
             },
           },
@@ -1160,6 +1185,11 @@ export class AntigravityRuntime {
     conv: Conversation,
     tenantKey: string,
   ) {
+    const root = this.nativeWriteRoot
+    const writeTarget = root === undefined ? undefined : (
+      call: import('./acp-process.ts').AcpSessionUpdate,
+      name: string,
+    ) => hostWriter(name) !== undefined ? nativeWriteTarget(root, call) : undefined
     return {
       onUpdate: (update: import('./acp-process.ts').AcpSessionUpdate) => {
         if (!this.owns(proc, conv) || conv.tenantKey !== tenantKey) return
@@ -1171,12 +1201,24 @@ export class AntigravityRuntime {
           if (this.catalog.observe(update.configOptions))
             this.host.onModelsChanged()
         }
-        if (recordReportedToolCall(conv, update) === 'conflict') {
+        if (recordReportedToolCall(conv, update, writeTarget) === 'conflict') {
           this.host.log.warn(
             `antigravity-acp: agent reported conflicting identity for tool call ${String(update.toolCallId)}`,
           )
         }
-        conv.turn?.onUpdate(update)
+        const turn = conv.turn
+        if (root !== undefined && turn !== undefined && this.host.onNativeWrite && update.toolCallId !== undefined) {
+          const reported = conv.reportedToolCalls.get(update.toolCallId)
+          const activity = reported && turn.nativeWriteActivity.observe(update, reported, root)
+          if (activity !== undefined) {
+            try {
+              this.host.onNativeWrite(conv.key, activity)
+            } catch (error) {
+              this.host.log.warn(`antigravity-acp: could not record native write: ${String(error)}`)
+            }
+          }
+        }
+        turn?.onUpdate(update)
         if (update.sessionUpdate === 'usage_update') {
           const hasPositiveUsed =
             typeof update.used === 'number' &&
@@ -1277,12 +1319,12 @@ export class AntigravityRuntime {
     this.tenants.set(tenantKey, conv)
 
     const sessionParams = {
-      cwd: this.preflight?.workspace ?? this.home,
+      cwd: this.nativeWriteRoot ?? this.preflight?.workspace ?? this.home,
       mcpServers,
       _meta: {
         antigravity: {
           systemPrompt: {
-            append: bridgeSystemPrompt(),
+            append: bridgeSystemPrompt(this.nativeWriteRoot !== undefined),
           },
         },
       },
@@ -1525,6 +1567,22 @@ export class AntigravityRuntime {
       claimed.toolName !== reported.toolName
     )
       return reject('tool name conflict')
+    const root = this.nativeWriteRoot
+    const name = request.toolCall?.name
+    const writer = hostWriter(name)
+    if (
+      root !== undefined && writer !== undefined &&
+      reported.serverName === `non-pi:${name}`
+    ) {
+      if (request.toolCall?.kind !== 'edit' || reported.kind !== 'edit')
+        return reject('native writer kind is not edit')
+      if (!conv.nativeWriteTools.has(writer))
+        return reject(`Pi ${writer} was not enabled for this request`)
+      const target = nativeWriteTarget(root, request.toolCall)
+      if (target === undefined || target !== reported.nativeWritePath)
+        return reject('native write target is ambiguous, disagrees with the report, or is outside the workspace')
+      return pick('allow_once') ?? { outcome: 'cancelled' }
+    }
     if (reported.serverName !== MCP_SERVER_NAME)
       return reject(`unknown MCP server ${reported.serverName ?? '(none)'}`)
     const isAllowedTool =

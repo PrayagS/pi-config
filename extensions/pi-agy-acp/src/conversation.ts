@@ -29,6 +29,7 @@ import {
   CALL_TOOL_NAME,
   MCP_SERVER_NAME,
 } from './history.ts'
+import { NativeWriteActivity } from './native-write-activity.ts'
 import { AsyncQueue, deferred, type Deferred } from './util.ts'
 
 /** Agent-side transport retry notice streamed as message text, e.g. `⚠ API error (attempt 1): …`. */
@@ -168,6 +169,7 @@ export class AcpTurn {
   releaseSignal: (() => void) | undefined
   readonly startedAt = performance.now()
   readonly events = new AsyncQueue<TurnEvent>()
+  readonly nativeWriteActivity = new NativeWriteActivity()
   /** Calls handed to Pi whose results have not arrived yet. */
   readonly pendingCalls = new Map<string, ParkedCall>()
   /** Calls the agent issued during this turn. */
@@ -480,8 +482,10 @@ export class AcpTurn {
       this.contextUsed = update.used
       return
     }
-    const text =
-      update.content?.type === 'text' ? (update.content.text ?? '') : ''
+    const content = update.content
+    const text = !Array.isArray(content) && content?.type === 'text'
+      ? (content.text ?? '')
+      : ''
     if (update.sessionUpdate === 'agent_message_chunk' && text.length > 0) {
       this.consumeMessage(text)
       return
@@ -954,6 +958,7 @@ export interface ReportedToolCall {
   kind?: string
   serverName?: string
   toolName?: string
+  nativeWritePath?: string
   /** Set when later updates contradicted an already established field. */
   conflict?: boolean
 }
@@ -1054,6 +1059,7 @@ export function structuredToolMeta(
 export function recordReportedToolCall(
   conv: { reportedToolCalls: Map<string, ReportedToolCall> },
   update: AcpSessionUpdate,
+  writeTarget?: (update: AcpSessionUpdate, toolName: string) => string | undefined,
 ): 'created' | 'merged' | 'conflict' | undefined {
   if (
     update.sessionUpdate !== 'tool_call' &&
@@ -1084,6 +1090,17 @@ export function recordReportedToolCall(
     if (merged.toolName !== undefined && merged.toolName !== toolName)
       conflict = true
     else merged.toolName = toolName
+  }
+  if (
+    writeTarget !== undefined &&
+    merged.toolName !== undefined &&
+    merged.serverName === `non-pi:${merged.toolName}` &&
+    update.rawInput !== undefined
+  ) {
+    const target = writeTarget(update, merged.toolName)
+    if (merged.nativeWritePath !== undefined && target !== merged.nativeWritePath)
+      conflict = true
+    else if (target !== undefined) merged.nativeWritePath = target
   }
   if (conflict) merged.conflict = true
   conv.reportedToolCalls.set(update.toolCallId, merged)

@@ -62,6 +62,8 @@ Start `pi`, then use `/model` to select a model under `antigravity-acp` (or run
 | Command | Purpose |
 | --- | --- |
 | `/agy-acp` or `/agy-acp status` | Show runtime state, account details, models, sessions, and the last turn. |
+| `/agy-acp config [key [value]]` | Show or update settings in `~/.pi/agent/antigravity-acp.json`. |
+| `/agy-acp native-writes [on\|off]` | Show or save whether agy handles file edits and writes. |
 | `/agy-acp quota [used\|remaining]` | Show account details, grouped quota bars, and reset countdowns (remembers the last selected mode). |
 | `/agy-acp refresh` | Force a live model catalog refresh from `agy` without starting a conversation. |
 | `/agy-acp reset` | Dispose the ACP runtime and clear sessions, quota cache, and warning history; the next request rebuilds from Pi's history. |
@@ -73,14 +75,15 @@ After an Antigravity turn settles, the status bar shows quota usage (for example
 Default prices are zero, not a promise of free calls. Pi pricing overrides are
 used when configured.
 
-### Environment variables
+### Configuration
 
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `PI_AGY_COMMAND` | Absolute path to the `agy` executable. | Auto-discovered |
-| `PI_AGY_HOME` | Isolated directory for ACP state, logs, and caches. | `~/.pi/agent/cache/antigravity-acp` |
-| `PI_AGY_QUOTA_DISPLAY` | Startup quota display mode (`used` or `remaining`). | `settings.json`, then `used` |
-| `PI_AGY_DEBUG` | Set to `1` to print runtime warnings on `stderr`. | Unset (silent) |
+Run `/agy-acp config` to show effective settings. Save a setting with
+`/agy-acp config <key> <value>` or remove an override with `default`.
+See the [configuration reference](docs/reference.md#configuration) for keys
+and migration from the old environment variables.
+
+To opt in to [native file writes](docs/reference.md#native-file-writes), run
+`/agy-acp native-writes on` from the intended workspace.
 
 ## Tests
 

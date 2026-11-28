@@ -38,6 +38,7 @@ import {
   resolve,
 } from 'node:path'
 import { readJson } from './config.ts'
+import { NATIVE_AGENT_WRITERS } from './native-writes.ts'
 import { removeArtifacts } from './session-db.ts'
 
 /** Agent id installed in the isolated home. */
@@ -265,15 +266,12 @@ export function defaultAgyHomes(
  * @returns `~/.pi/agent/cache/antigravity-acp`.
  */
 export function defaultHome(): string {
-  return (
-    process.env.PI_AGY_HOME ||
-    join(homedir(), '.pi', 'agent', 'cache', 'antigravity-acp')
-  )
+  return join(homedir(), '.pi', 'agent', 'cache', 'antigravity-acp')
 }
 
 /**
  * Whether `home` points to the default isolated Pi Antigravity home
- * (`~/.pi/agent/cache/antigravity-acp`) rather than a custom `PI_AGY_HOME`.
+ * (`~/.pi/agent/cache/antigravity-acp`) rather than a custom state directory.
  */
 export function isDefaultPiAgyHome(
   home: string,
@@ -284,9 +282,10 @@ export function isDefaultPiAgyHome(
   const expected = resolve(
     join(userHome, '.pi', 'agent', 'cache', 'antigravity-acp'),
   )
-  return platform === 'win32'
-    ? actual.toLowerCase() === expected.toLowerCase()
-    : actual === expected
+  const normalize = (value: string) => platform === 'win32' ? value.toLowerCase() : value
+  return [expected, join(expected, 'native-writes')].some(
+    (candidate) => normalize(actual) === normalize(candidate),
+  )
 }
 
 function ensureRealDirectory(
@@ -394,8 +393,8 @@ export function atomicWriteFile(
 /**
  * Seed or refresh the isolated `antigravity-oauth-token` file from the user's
  * Antigravity CLI home (`ANTIGRAVITY_CLI_HOME`, `AGY_HOME`, or
- * `~/.gemini/antigravity-cli`) whenever the default `PI_AGY_HOME` is in use
- * and the host uses file-backed token storage. Custom `PI_AGY_HOME` roots stay
+ * `~/.gemini/antigravity-cli`) whenever the default state directory is in use
+ * and the host uses file-backed token storage. Custom state directories stay
  * strictly isolated.
  * @param home - isolated `--gemini-dir` root.
  * @param userHome - optional user home override for testing.
@@ -511,6 +510,7 @@ export function prepareHome(
   env: NodeJS.ProcessEnv = process.env,
   onWarn?: (message: string) => void,
   retainedSessionIds?: ReadonlySet<string>,
+  nativeWrites = false,
 ): string {
   const pluginDir = ensureRealDirectory(home, [
     'config',
@@ -527,12 +527,17 @@ export function prepareHome(
     [
       '---',
       `name: ${BRIDGE_AGENT}`,
-      'description: "Pi primary-model bridge: no built-in tools, harness tools only"',
-      'tools: []',
+      nativeWrites
+        ? 'description: "Pi primary-model bridge with native file writes"'
+        : 'description: "Pi primary-model bridge: no built-in tools, harness tools only"',
+      `tools: [${nativeWrites ? NATIVE_AGENT_WRITERS.join(', ') : ''}]`,
       'excludeDefaultComponents: true',
+      ...(nativeWrites ? ['inheritCustomizations: false'] : []),
       'mainAgent: true',
       '---',
-      'Follow the appended system instructions exactly. Act only through the harness tools you are given.',
+      nativeWrites
+        ? 'Use Pi tools for reads and native file tools for edits and writes. Follow the appended system instructions.'
+        : 'Follow the appended system instructions exactly. Act only through the harness tools you are given.',
       '',
     ].join('\n'),
   )
@@ -568,7 +573,18 @@ export function prepareHome(
   const settings = readJson(settingsPath)
   writeIfChanged(
     settingsPath,
-    `${JSON.stringify({ ...settings, toolPermission: 'request-review', agentMode: '' }, null, 2)}\n`,
+    `${JSON.stringify({
+      ...settings,
+      toolPermission: 'request-review',
+      agentMode: '',
+      ...(nativeWrites ? {
+        permissions: {
+          allow: [],
+          ask: ['write_file(*)'],
+          deny: ['command(*)', 'unsandboxed(*)', 'read_url(*)', 'execute_url(*)'],
+        },
+      } : {}),
+    }, null, 2)}\n`,
   )
   const workspace = ensureRealDirectory(home, ['workspace'])
   return workspace

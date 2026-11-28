@@ -1,5 +1,7 @@
+import { join } from 'node:path'
 import {
   BorderedLoader,
+  getAgentDir,
   type ExtensionAPI,
   type ProviderModelConfig,
   type ExtensionContext,
@@ -7,13 +9,17 @@ import {
 import { AntigravityRuntime, type RuntimeHost } from './src/runtime.ts'
 import {
   asQuotaDisplay,
-  DEFAULT_QUOTA_DISPLAY,
   defaults,
-  readQuotaDisplayPreference,
-  writeQuotaDisplayPreference,
-  type QuotaDisplay,
+  parsePreferenceValue,
+  PREFERENCE_KEYS,
+  readPreferences,
+  SETTINGS_FILE,
+  writePreferences,
+  type PreferenceKey,
 } from './src/config.ts'
 import { spawnAcp, runCommand } from './src/host.ts'
+import { appendNativeWriteEntry, registerNativeWriteEntries } from './src/native-write-entry.ts'
+import { defaultHome } from './src/preflight.ts'
 import { streamPi } from './src/pi-stream.ts'
 import {
   displayFraction,
@@ -28,38 +34,45 @@ export default function (
   pi: ExtensionAPI,
   host: Partial<Pick<RuntimeHost, 'runCommand' | 'spawnAcp' | 'quotaNow'>> = {},
 ) {
-  const envQuotaDisplay = asQuotaDisplay(process.env.PI_AGY_QUOTA_DISPLAY)
-  const debug = process.env.PI_AGY_DEBUG === '1'
-  const config = {
-    ...defaults,
-    command: process.env.PI_AGY_COMMAND || '',
-    home: process.env.PI_AGY_HOME || '',
-  }
+  const config = defaults
+  const stateHome = defaultHome()
+  const configPath = join(getAgentDir(), SETTINGS_FILE)
+  const launchCwd = process.cwd()
+  let preferences = readPreferences(configPath, stateHome)
+  let piSessionId: string | undefined
+  registerNativeWriteEntries(pi)
+  pi.on('tool_call', (event, ctx) => {
+    if (
+      preferences.nativeWrites && ctx.model?.provider === config.provider &&
+      (event.toolName === 'edit' || event.toolName === 'write')
+    ) return { block: true, reason: 'Use native agy file tools instead of Pi edit/write.' }
+  })
   let refreshDepth = 0
   const createRuntime = () =>
     new AntigravityRuntime({
-      config,
+      config: {
+        ...config,
+        command: preferences.command,
+        home: preferences.home || stateHome,
+        nativeWriteRoot: preferences.nativeWrites ? launchCwd : undefined,
+      },
       spawnAcp: host.spawnAcp ?? spawnAcp,
       runCommand: host.runCommand ?? runCommand,
       quotaNow: host.quotaNow,
       log: {
         info: () => {},
-        warn: debug
-          ? (message) => {
-              process.stderr.write(`[pi-agy-acp] ${message}\n`)
-            }
-          : () => {},
+        warn: (message) => {
+          if (preferences.debug) process.stderr.write(`[pi-agy-acp] ${message}\n`)
+        },
       },
       onModelsChanged: () => {
         if (refreshDepth === 0) register()
       },
+      onNativeWrite: (sessionId, activity) => {
+        if (sessionId === piSessionId) appendNativeWriteEntry(pi, activity)
+      },
     })
   let runtime = createRuntime()
-  const home = runtime.status().home
-  let quotaDisplay: QuotaDisplay =
-    envQuotaDisplay ??
-    readQuotaDisplayPreference(home) ??
-    DEFAULT_QUOTA_DISPLAY
   const models = (): ProviderModelConfig[] => {
     const input = runtime.catalog.inputModalities()
     return runtime.catalog.list().map((m) => {
@@ -145,7 +158,7 @@ export default function (
       ctx.ui.setStatus(
         config.provider,
         snapshot
-          ? formatQuotaStatus(snapshot, model, quotaDisplay)
+          ? formatQuotaStatus(snapshot, model, preferences.quotaDisplay)
           : undefined,
       )
   }
@@ -170,6 +183,7 @@ export default function (
   pi.on('session_tree', () => activeRuntime?.resetConversations())
   pi.on('session_compact', () => activeRuntime?.resetConversations())
   pi.on('session_start', async (event, ctx) => {
+    piSessionId = ctx.sessionManager.getSessionId()
     clearStatus(ctx)
     const epoch = uiEpoch
     if (resetting) await resetting.catch(() => {})
@@ -180,6 +194,7 @@ export default function (
       updateStatus(ctx, activeRuntime?.quota.peek())
   })
   pi.on('session_shutdown', async (_event, ctx) => {
+    piSessionId = undefined
     clearStatus(ctx)
     shutDown = true
     activeRuntime = undefined
@@ -253,9 +268,9 @@ export default function (
         if (warned.has(key)) return
         warned.add(key)
         const percent = Math.round(
-          displayFraction(quota.fraction, quotaDisplay) * 100,
+          displayFraction(quota.fraction, preferences.quotaDisplay) * 100,
         )
-        const metric = `${percent}% ${quotaDisplay}`
+        const metric = `${percent}% ${preferences.quotaDisplay}`
         targetCtx.ui.notify(
           `Antigravity quota low: ${metric} (${groupName}, ${windowLabel}).`,
           'warning',
@@ -326,15 +341,50 @@ export default function (
           return loader
         })
       : run()
+  const setPreference = async (
+    ctx: ExtensionContext,
+    key: PreferenceKey,
+    value: string | boolean | undefined,
+  ): Promise<boolean> => {
+    if (resetting || !ctx.isIdle() || runtime.status().activeTurns > 0) {
+      ctx.ui.notify('Wait until Antigravity and Pi are idle before changing ACP settings.', 'warning')
+      return false
+    }
+    const previous = preferences
+    try {
+      preferences = writePreferences(configPath, stateHome, { [key]: value })
+    } catch (error) {
+      ctx.ui.notify(`Could not update ${configPath}: ${String(error)}`, 'error')
+      return false
+    }
+    if (
+      previous.command !== preferences.command ||
+      previous.home !== preferences.home ||
+      previous.nativeWrites !== preferences.nativeWrites
+    ) {
+      clearStatus(ctx)
+      await reset()
+      if (shutDown) return false
+      register()
+    } else {
+      updateStatus(ctx, activeRuntime?.quota.peek())
+    }
+    return true
+  }
   pi.registerCommand('agy-acp', {
-    description: 'Antigravity ACP status, quota, refresh, or reset',
+    description: 'Antigravity ACP configuration, status, quota, refresh, or reset',
     getArgumentCompletions: (prefix) => {
       const normalized = prefix.trimStart()
       const items = [
         'status',
+        'config',
+        ...PREFERENCE_KEYS.map((key) => `config ${key}`),
         'quota',
         'quota used',
         'quota remaining',
+        'native-writes',
+        'native-writes on',
+        'native-writes off',
         'refresh',
         'reset',
       ]
@@ -346,6 +396,48 @@ export default function (
       if (shutDown) return
       const tokens = args.trim().split(/\s+/).filter(Boolean)
       const command = tokens[0] ?? ''
+      if (command === 'config') {
+        const effective = {
+          ...preferences,
+          command: preferences.command || '(auto-discovered)',
+          home: preferences.home || stateHome,
+        }
+        if (tokens.length === 1) {
+          ctx.ui.notify(`${configPath}\n${JSON.stringify(effective, null, 2)}`, 'info')
+          return
+        }
+        const [, name, raw] = /^config\s+(\S+)(?:\s+([\s\S]+))?$/.exec(args.trim()) ?? []
+        const key = PREFERENCE_KEYS.find((item) => item === name)
+        if (key === undefined) {
+          ctx.ui.notify(`Usage: /agy-acp config [${PREFERENCE_KEYS.join('|')} [value]]`, 'warning')
+          return
+        }
+        if (raw === undefined) {
+          ctx.ui.notify(`${key}: ${effective[key]} (${configPath})`, 'info')
+          return
+        }
+        let value: string | boolean | undefined
+        try {
+          value = parsePreferenceValue(key, raw)
+        } catch (error) {
+          ctx.ui.notify(error instanceof Error ? error.message : String(error), 'warning')
+          return
+        }
+        if (await setPreference(ctx, key, value))
+          ctx.ui.notify(`Saved ${key}: ${value ?? 'default'} to ${configPath}`, 'info')
+        return
+      }
+      if (command === 'native-writes') {
+        const setting = tokens[1]
+        if (tokens.length === 1) {
+          ctx.ui.notify(`Antigravity native writes: ${preferences.nativeWrites ? 'on' : 'off'} (${configPath})`, 'info')
+        } else if (tokens.length !== 2 || (setting !== 'on' && setting !== 'off')) {
+          ctx.ui.notify('Usage: /agy-acp native-writes [on|off]', 'warning')
+        } else if (await setPreference(ctx, 'nativeWrites', setting === 'on')) {
+          ctx.ui.notify(`Antigravity native writes: ${setting} (saved to ${configPath})`, 'info')
+        }
+        return
+      }
       const requestedDisplay =
         command === 'quota' && tokens.length === 2
           ? asQuotaDisplay(tokens[1])
@@ -388,15 +480,13 @@ export default function (
         (tokens.length === 1 || requestedDisplay !== undefined)
       if (!isStatus && !isQuota) {
         ctx.ui.notify(
-          'Usage: /agy-acp [status|quota [used|remaining]|refresh|reset]',
+          'Usage: /agy-acp [status|config|native-writes [on|off]|quota [used|remaining]|refresh|reset]',
           'warning',
         )
         return
       }
-      if (requestedDisplay !== undefined) {
-        quotaDisplay = requestedDisplay
-        writeQuotaDisplayPreference(home, quotaDisplay)
-      }
+      if (requestedDisplay !== undefined && !(await setPreference(ctx, 'quotaDisplay', requestedDisplay)))
+        return
       let snapshot: QuotaSnapshot | null = null
       const epoch = uiEpoch
       if (command === 'quota') {
@@ -415,7 +505,7 @@ export default function (
         }
       }
       const notice = snapshot
-        ? formatQuota(snapshot, undefined, quotaDisplay)
+        ? formatQuota(snapshot, undefined, preferences.quotaDisplay)
         : formatStatus(
             runtime.status(
               ctx.model?.provider === config.provider

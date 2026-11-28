@@ -34,12 +34,14 @@ export interface AcpSessionListener {
 /** One `session/update` payload. */
 export interface AcpSessionUpdate {
   sessionUpdate: string
-  content?: { type: string; text?: string }
+  content?: { type: string; text?: string } | AcpToolCallContent[]
   toolCallId?: string
   name?: string
   title?: string
   status?: string
   kind?: string
+  rawInput?: unknown
+  locations?: readonly { path?: string }[]
   mcpServerName?: string
   mcpToolName?: string
   _meta?: AcpToolCallMeta
@@ -47,6 +49,14 @@ export interface AcpSessionUpdate {
   used?: number
   size?: number
   [key: string]: unknown
+}
+
+/** Tool content blocks sent by ACP; only native diffs are used here. */
+export interface AcpToolCallContent {
+  type: string
+  path?: string
+  oldText?: string
+  newText?: string
 }
 
 /** Structured MCP metadata the agent reports for one tool call. */
@@ -121,6 +131,7 @@ export interface AcpPermissionRequest {
     title?: string
     kind?: string
     rawInput?: unknown
+    locations?: readonly { path?: string }[]
     mcpServerName?: string
     mcpToolName?: string
     _meta?: AcpToolCallMeta

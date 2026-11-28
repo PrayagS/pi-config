@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { PassThrough } from 'node:stream'
-import { describe, it } from 'node:test'
+import { describe, it, type TestContext } from 'node:test'
 import type { AcpChild, AcpSpawner } from '../src/acp-process.ts'
-import { defaults } from '../src/config.ts'
+import { defaults, type Config } from '../src/config.ts'
 import type { GenerateOptions, RequestMessage, StreamChunk } from '../src/protocol.ts'
-import { AntigravityRuntime } from '../src/runtime.ts'
+import { AntigravityRuntime, type RuntimeHost } from '../src/runtime.ts'
 
 interface FakeRpcMessage {
   jsonrpc: '2.0'
@@ -43,6 +43,7 @@ interface FakeAcpHarness {
   promptsReceived: Array<{ sessionId: string; prompt: unknown[] }>
   resumedSessions: string[]
   newSessions: string[]
+  newSessionCwds: unknown[]
   cancels: string[]
   sessionIds: string[]
   writeDbStep: (sessionId: string, label: string) => void
@@ -54,6 +55,7 @@ function createFakeAcp(home: string, handlers: FakeAgentHandlers): FakeAcpHarnes
   const promptsReceived: Array<{ sessionId: string; prompt: unknown[] }> = []
   const resumedSessions: string[] = []
   const newSessions: string[] = []
+  const newSessionCwds: unknown[] = []
   const cancels: string[] = []
   const sessionIds: string[] = []
 
@@ -178,6 +180,7 @@ function createFakeAcp(home: string, handlers: FakeAgentHandlers): FakeAcpHarnes
           const sid = randomUUID()
           sessionIds.push(sid)
           newSessions.push(sid)
+          newSessionCwds.push(params.cwd)
           ensureDb(sid)
           const servers = (params.mcpServers as Array<{ url?: string; headers?: Array<{ name: string; value: string }> }>) ?? []
           const srv = servers[0]
@@ -292,6 +295,7 @@ function createFakeAcp(home: string, handlers: FakeAgentHandlers): FakeAcpHarnes
     promptsReceived,
     resumedSessions,
     newSessions,
+    newSessionCwds,
     cancels,
     sessionIds,
     writeDbStep,
@@ -339,7 +343,8 @@ function makeRuntime(
   home: string,
   bin: string,
   spawner: AcpSpawner,
-  extra: Partial<{ detachAfterMs: number; cancelTimeoutMs: number }> = {},
+  extra: Partial<Pick<Config, 'detachAfterMs' | 'cancelTimeoutMs' | 'nativeWriteRoot'>> = {},
+  onNativeWrite?: RuntimeHost['onNativeWrite'],
 ): AntigravityRuntime {
   return new AntigravityRuntime({
     config: {
@@ -347,15 +352,276 @@ function makeRuntime(
       command: bin,
       home,
       parkSettleMs: 10,
-      ...(extra.detachAfterMs !== undefined ? { detachAfterMs: extra.detachAfterMs } : {}),
-      ...(extra.cancelTimeoutMs !== undefined ? { cancelTimeoutMs: extra.cancelTimeoutMs } : {}),
+      ...extra,
     },
     spawnAcp: spawner,
     runCommand: async () => ({ code: 0, stdout: '1.5.16\n', stderr: '' }),
     log: { info: () => {}, warn: () => {} },
     onModelsChanged: () => {},
+    ...(onNativeWrite === undefined ? {} : { onNativeWrite }),
   })
 }
+
+const piFileTools = ['read', 'edit', 'write'].map((name) => ({
+  name,
+  description: `Pi ${name}`,
+  parameters: {
+    type: 'object',
+    properties: { path: { type: 'string' }, content: { type: 'string' } },
+    required: name === 'write' ? ['path', 'content'] : ['path'],
+  },
+}))
+
+function nativeWriteFixture(
+  t: TestContext,
+  onPrompt: FakeAgentHandlers['onPrompt'],
+  enabled = true,
+  onNativeWrite?: RuntimeHost['onNativeWrite'],
+) {
+  const home = mkdtempSync(join(tmpdir(), 'pi-agy-native-'))
+  const workspace = join(home, 'workspace')
+  const workspaceAlias = join(home, 'workspace-alias')
+  const outside = join(home, 'workspace-outside')
+  mkdirSync(workspace)
+  mkdirSync(outside)
+  symlinkSync(workspace, workspaceAlias, 'dir')
+  const fake = createFakeAcp(home, { onPrompt })
+  const runtime = makeRuntime(home, makeFakeBinary(home), fake.spawner, {
+    ...(enabled ? { nativeWriteRoot: workspaceAlias } : {}),
+  }, onNativeWrite)
+  t.after(async () => {
+    try {
+      await runtime.dispose({ purgeArtifacts: true })
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+  return { fake, runtime, workspace: realpathSync(workspace), outside: realpathSync(outside) }
+}
+
+const nativeWriteOptions = [
+  { kind: 'allow_always', optionId: 'always' },
+  { kind: 'allow_once', optionId: 'once' },
+  { kind: 'reject_once', optionId: 'reject' },
+]
+const allowOnce = { outcome: { outcome: 'selected', optionId: 'once' } }
+const rejectOnce = { outcome: { outcome: 'selected', optionId: 'reject' } }
+
+function nativeFileCall(name: string, path: string, field: 'Path' | 'TargetFile' = 'TargetFile') {
+  return { name, kind: 'edit', rawInput: { [field]: path }, locations: [{ path }] }
+}
+
+type PromptContext = Parameters<FakeAgentHandlers['onPrompt']>[0]
+
+function finishFakeTurn(ctx: PromptContext) {
+  ctx.sendUpdate({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Done' } })
+  ctx.reply({ stopReason: 'end_turn' })
+}
+
+function askToolPermission(
+  ctx: PromptContext,
+  toolCall: Record<string, unknown>,
+  report: Record<string, unknown> | null = toolCall,
+  toolCallId = randomUUID(),
+): Promise<unknown> {
+  if (report !== null) {
+    ctx.sendUpdate({ sessionUpdate: 'tool_call', status: 'pending', toolCallId, ...report })
+  }
+  return ctx.sendPermission({ toolCall: { toolCallId, ...toolCall }, options: nativeWriteOptions })
+}
+
+const nativeWriteRequest = {
+  model: 'gemini-4-neon',
+  sessionId: 'sess-native-write',
+  system: 'sys',
+  tools: piFileTools,
+}
+const nativeWriteInput: RequestMessage = {
+  id: 'u1', role: 'user', content: [{ type: 'text', text: 'Update the workspace' }],
+}
+
+describe('AntigravityRuntime native write opt-in', () => {
+  it('filters Pi edit/write from MCP and dynamic schemas without removing read or other tools', async (t) => {
+    let listedTools: string[] = []
+    const mcpWriteResults: Record<string, unknown>[] = []
+    let mcpError: unknown
+    const otherTool = { name: 'check', description: 'Check files', parameters: { type: 'object' } }
+    const tools = [...piFileTools, otherTool]
+    const { fake, runtime, workspace } = nativeWriteFixture(t, async (ctx) => {
+      const { mcpUrl, mcpAuth } = ctx
+      if (fake.promptsReceived.length === 1 && mcpUrl !== undefined) {
+        try {
+          const list = await mcpPost(mcpUrl, mcpAuth, { id: 1, method: 'tools/list', params: {} })
+          listedTools = (list.result as { tools?: Array<{ name: string }> })?.tools?.map((tool) => tool.name) ?? []
+          const write = { name: 'write', arguments: { path: join(workspace, 'new.txt'), content: 'hello' } }
+          for (const params of [write, { name: 'pi_call_tool', arguments: write }]) {
+            mcpWriteResults.push(await mcpPost(mcpUrl, mcpAuth, { id: 2, method: 'tools/call', params }))
+          }
+        } catch (error) {
+          mcpError = error
+        }
+      }
+      finishFakeTurn(ctx)
+    })
+
+    const first = await collectChunks(runtime.stream({ ...nativeWriteRequest, tools, messages: [nativeWriteInput] }))
+    assert.equal(mcpError, undefined)
+    assert.deepEqual(listedTools.sort(), ['check', 'pi_call_tool', 'read'])
+    assert.ok(first.some((c) => c.type === 'finish' && c.reason.kind === 'stop'))
+    assert.equal(mcpWriteResults.length, 2)
+    for (const response of mcpWriteResults) {
+      const result = response.result as { isError?: boolean; content?: Array<{ text: string }> }
+      assert.equal(result?.isError, true)
+      assert.match(result?.content?.[0]?.text ?? '', /(?:no|unknown).*tool.*write/i)
+    }
+    assert.ok(!first.some((c) => c.type === 'block-start' && c.blockType === 'tool-call'))
+    assert.deepEqual(fake.newSessionCwds, [workspace])
+
+    await collectChunks(runtime.stream({
+      ...nativeWriteRequest,
+      tools: tools.map((tool) => ({ ...tool, description: `${tool.description} (updated)` })),
+      messages: [
+        nativeWriteInput,
+        { id: 'a1', role: 'assistant', source: { kind: 'model', provider: 'antigravity-acp' }, content: [{ type: 'text', text: 'Done' }] },
+        { id: 'u2', role: 'user', content: [{ type: 'text', text: 'Continue' }] },
+      ],
+    }))
+    assert.deepEqual(fake.promptsReceived.map((p) => p.sessionId), [fake.newSessions[0], fake.newSessions[0]])
+    const update = fake.promptsReceived[1]!.prompt.find(
+      (block): block is { type: 'text'; text: string } =>
+        (block as { text?: string }).text?.startsWith('<harness_tool_update>') === true,
+    )
+    assert.ok(update)
+    assert.match(update.text, /"name":"read"/)
+    assert.match(update.text, /"name":"check"/)
+    assert.doesNotMatch(update.text, /"name":"(?:write|edit)"/)
+  })
+
+  it('reports one completed native edit with its pending diff without emitting a Pi tool call', async (t) => {
+    const activities: Parameters<NonNullable<RuntimeHost['onNativeWrite']>>[] = []
+    const toolCallId = 'native-edit-1'
+    const diff = { oldText: 'old\n', newText: 'new\n' }
+    const { runtime, workspace } = nativeWriteFixture(t, (ctx) => {
+      ctx.sendUpdate({
+        sessionUpdate: 'tool_call',
+        toolCallId,
+        status: 'pending',
+        ...nativeFileCall('edit_file', path, 'Path'),
+        content: [{ type: 'diff', path, ...diff }],
+      })
+      const completed = { sessionUpdate: 'tool_call_update', toolCallId, status: 'completed' }
+      ctx.sendUpdate(completed)
+      ctx.sendUpdate(completed)
+      finishFakeTurn(ctx)
+    }, true, (sessionId, activity) => activities.push([sessionId, activity]))
+    const path = join(workspace, 'existing.txt')
+    writeFileSync(path, diff.oldText)
+
+    const chunks = await collectChunks(runtime.stream({ ...nativeWriteRequest, messages: [nativeWriteInput] }))
+    assert.deepEqual(activities, [[nativeWriteRequest.sessionId, {
+      toolCallId, name: 'edit_file', status: 'completed', path, diff,
+    }]])
+    assert.ok(chunks.some((c) => c.type === 'finish' && c.reason.kind === 'stop'))
+    assert.ok(!chunks.some((c) => c.type === 'block-start' && c.blockType === 'tool-call'))
+  })
+
+  it('grants only reported native edits and creates with a consistent workspace target', async (t) => {
+    const outcomes: unknown[] = []
+    const firstToolCallId = randomUUID()
+    let idlePermission: (() => Promise<unknown>) | undefined
+    const { runtime, workspace, outside } = nativeWriteFixture(t, async (ctx) => {
+      for (const [i, { claimed, report }] of requests.entries()) {
+        outcomes.push(await askToolPermission(ctx, claimed, report, i === 0 ? firstToolCallId : undefined))
+      }
+      idlePermission = () => askToolPermission(ctx, edit, null, firstToolCallId)
+      finishFakeTurn(ctx)
+    })
+    const existing = join(workspace, 'existing.txt')
+    const other = join(workspace, 'other.txt')
+    const created = join(workspace, 'new.txt')
+    const outsideFile = join(outside, 'existing.txt')
+    const symlinkFile = join(workspace, 'linked.txt')
+    const symlinkDir = join(workspace, 'linked-dir')
+    writeFileSync(existing, 'original')
+    writeFileSync(other, 'other')
+    writeFileSync(outsideFile, 'outside')
+    symlinkSync(outsideFile, symlinkFile, 'file')
+    symlinkSync(outside, symlinkDir, 'dir')
+    const edit = nativeFileCall('replace_file_content', existing)
+    const requests: Array<{
+      label: string
+      claimed: Record<string, unknown>
+      report?: Record<string, unknown> | null
+      allowed?: true
+    }> = [
+      { label: 'native edit', claimed: edit, allowed: true },
+      { label: 'native multi-replace', claimed: nativeFileCall('multi_replace_file_content', existing), allowed: true },
+      {
+        label: 'native create with an equivalent relative target and no locations in request',
+        claimed: { name: 'write_to_file', kind: 'edit', rawInput: { Path: 'new.txt' } },
+        report: nativeFileCall('write_to_file', created, 'Path'),
+        allowed: true,
+      },
+      { label: 'native shell presented as edit', claimed: nativeFileCall('run_command', existing) },
+      { label: 'non-edit kind in request', claimed: { ...edit, kind: 'execute' }, report: edit },
+      { label: 'non-edit kind in report', claimed: edit, report: { ...edit, kind: 'execute' } },
+      { label: 'different targets in report and request', claimed: edit, report: nativeFileCall(edit.name, other) },
+      { label: 'different rawInput and location targets', claimed: { ...edit, locations: [{ path: other }] } },
+      { label: 'tool call ID was never reported', claimed: edit, report: null },
+      { label: 'title is not a structured identity', claimed: { ...edit, name: undefined, title: edit.name } },
+      { label: 'target outside workspace', claimed: nativeFileCall(edit.name, outsideFile) },
+      { label: 'symlink file escapes workspace', claimed: nativeFileCall(edit.name, symlinkFile) },
+      { label: 'create through symlink directory escapes workspace', claimed: nativeFileCall('create_file', join(symlinkDir, 'new.txt'), 'Path') },
+      { label: 'Pi MCP write permission also stays disabled', claimed: { ...edit, name: 'mcp_pi_write' } },
+    ]
+
+    const chunks = await collectChunks(runtime.stream({ ...nativeWriteRequest, messages: [nativeWriteInput] }))
+    assert.ok(chunks.some((c) => c.type === 'finish' && c.reason.kind === 'stop'))
+    for (const [i, { label, allowed }] of requests.entries()) {
+      assert.deepEqual(outcomes[i], allowed ? allowOnce : rejectOnce, label)
+    }
+    assert.ok(idlePermission)
+    assert.deepEqual(await idlePermission(), rejectOnce, 'native writes require a live turn')
+  })
+
+  it('does not grant native edit if only the source Pi write tool was offered', async (t) => {
+    let edit: unknown
+    let create: unknown
+    const { runtime, workspace } = nativeWriteFixture(t, async (ctx) => {
+      edit = await askToolPermission(ctx, nativeFileCall('edit_file', existing))
+      create = await askToolPermission(ctx, nativeFileCall('create_file', join(workspace, 'new.txt'), 'Path'))
+      finishFakeTurn(ctx)
+    })
+    const existing = join(workspace, 'existing.txt')
+    writeFileSync(existing, 'original')
+    await collectChunks(runtime.stream({
+      ...nativeWriteRequest,
+      tools: piFileTools.filter((tool) => tool.name !== 'edit'),
+      messages: [nativeWriteInput],
+    }))
+    assert.deepEqual(edit, rejectOnce)
+    assert.deepEqual(create, allowOnce)
+  })
+
+  it('keeps Pi edit/write advertised and denies native edits without opt-in', async (t) => {
+    let listedTools: string[] = []
+    let edit: unknown
+    const { runtime, workspace } = nativeWriteFixture(t, async (ctx) => {
+      if (ctx.mcpUrl !== undefined) {
+        const list = await mcpPost(ctx.mcpUrl, ctx.mcpAuth, { id: 1, method: 'tools/list', params: {} })
+        listedTools = (list.result as { tools?: Array<{ name: string }> })?.tools?.map((tool) => tool.name) ?? []
+      }
+      edit = await askToolPermission(ctx, nativeFileCall('edit_file', existing))
+      finishFakeTurn(ctx)
+    }, false)
+    const existing = join(workspace, 'existing.txt')
+    writeFileSync(existing, 'original')
+    await collectChunks(runtime.stream({ ...nativeWriteRequest, messages: [nativeWriteInput] }))
+    assert.ok(listedTools.includes('edit'))
+    assert.ok(listedTools.includes('write'))
+    assert.deepEqual(edit, rejectOnce)
+  })
+})
 
 describe('AntigravityRuntime end-to-end upgraded flows', () => {
   it('omits pi_await_result, validates MCP tool args at boundary, and handles effort-suffixed models', async () => {

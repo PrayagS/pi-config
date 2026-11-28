@@ -9,13 +9,14 @@ details, see [architecture](architecture.md).
 | Command | Behavior |
 | --- | --- |
 | `/agy-acp` or `/agy-acp status` | Show a status panel with runtime state, paths, account details, sessions, model reasoning levels, and the last turn. |
+| `/agy-acp config [key [value]]` | Show effective settings or save a change while idle. |
+| `/agy-acp native-writes [on\|off]` | Show the current write mode or save and switch it while idle. |
 | `/agy-acp quota [used\|remaining]` | Show account details, grouped quota bars, and reset countdowns, optionally switching and saving the display mode. |
 | `/agy-acp refresh` | Force a live model catalog refresh from `agy` and update `catalog.json`. |
 | `/agy-acp reset` | Dispose the ACP runtime (stopping `agy`), clear sessions, status indicator, quota cache, and warning history; the next request rebuilds from Pi's history. |
 
-Subcommands support Tab completion (`status`, `quota`, `quota used`,
-`quota remaining`, `refresh`, `reset`). Unknown arguments show
-`Usage: /agy-acp [status|quota [used|remaining]|refresh|reset]` as a warning.
+Subcommands support Tab completion. Unknown arguments show
+`Usage: /agy-acp [status|config|native-writes [on|off]|quota [used|remaining]|refresh|reset]` as a warning.
 
 In interactive TUI mode, `/agy-acp quota` (`Fetching Antigravity quota...`) and
 `/agy-acp refresh` (`Refreshing Antigravity models...`) display a cancellable
@@ -57,7 +58,7 @@ Antigravity Quota
 
 - **Display mode:** Default is `used` (bars and percentages count up from `0%`).
   Pass `remaining` (`/agy-acp quota remaining`) to count down from `100%`. When
-  a mode is passed, it is saved to `<PI_AGY_HOME>/settings.json` immediately,
+  a mode is passed, it is saved to `antigravity-acp.json` immediately,
   even if the quota query is cancelled or fails.
 - **Reset labels:** Untouched rolling windows at `0%` used (`100%` remaining)
   whose reset time is still a full window away omit the countdown. Otherwise,
@@ -88,9 +89,9 @@ unavailable fields:
   runtime was idle) without sending a model prompt. Failure does not block quota
   display; use `/agy-acp reset` to retry discovery. Viewing status never probes
   `agy`.
-- **Email:** Read from `agy` login logs. With the default `PI_AGY_HOME`, the
+- **Email:** Read from `agy` login logs. With the default state directory, the
   extension also checks `ANTIGRAVITY_CLI_HOME`, `AGY_HOME`, and
-  `~/.gemini/antigravity-cli`; a custom `PI_AGY_HOME` stays isolated. Cached
+  `~/.gemini/antigravity-cli`; a custom `home` stays isolated. Cached
   plans and login logs can be stale after an account change.
 
 ### Quota status and warnings
@@ -123,42 +124,83 @@ provider (other providers are untouched):
 
 ## Configuration
 
-Set environment variables before starting Pi:
+Settings live in `~/.pi/agent/antigravity-acp.json` (under Pi's agent directory,
+independent of the agy state directory). Run `/agy-acp config` to see the
+file path and effective settings, `/agy-acp config <key>` to inspect one,
+or `/agy-acp config <key> <value>` to save a change. `default` removes the
+override. Changes to `command`, `home`, or `nativeWrites` replace the ACP
+runtime for the next turn without clearing Pi's chat. Editing the file by
+hand takes effect on restart.
 
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `PI_AGY_COMMAND` | Absolute path to the `agy` executable. | Automatic discovery. |
-| `PI_AGY_HOME` | Dedicated directory for this extension's state. | `~/.pi/agent/cache/antigravity-acp` |
-| `PI_AGY_QUOTA_DISPLAY` | Startup quota display mode (`used` or `remaining`), overriding `settings.json` for startup. Invalid values are ignored; `/agy-acp quota <mode>` overrides it for the active session. | `settings.json`, then `used` |
-| `PI_AGY_DEBUG` | Set to `1` to print runtime warnings on `stderr` (silent by default to protect the TUI). | Unset (silent) |
+| JSON key | Slash command value | Default | Replaces |
+| --- | --- | --- | --- |
+| `command` | Absolute path to the `agy` executable | Automatic discovery | `PI_AGY_COMMAND` |
+| `home` | Absolute ACP state directory | `~/.pi/agent/cache/antigravity-acp` | `PI_AGY_HOME` |
+| `quotaDisplay` | `used` or `remaining` | `used` | `PI_AGY_QUOTA_DISPLAY` |
+| `debug` | `on`/`off` (`true`/`false` in JSON) | `false` | `PI_AGY_DEBUG` |
+| `nativeWrites` | `on`/`off` (`true`/`false` in JSON) | `false` | — |
 
-```sh
-PI_AGY_COMMAND=/absolute/path/to/agy pi -e ./index.ts
-```
+For example, `/agy-acp config debug on` enables runtime warnings on stderr.
+The old `PI_AGY_*` variables are no longer read. If the new file is absent,
+previously saved quota and native-write preferences in the default state
+directory's `settings.json` still apply and are carried over on the first
+save. If you previously used a custom state directory, set its `home` and
+any other overrides explicitly in the new file.
 
 ### Stored data and authentication
 
-`PI_AGY_HOME` isolates the bridge agent from your normal `agy` tools and
-plugins. It stores the extension's `catalog.json`, `settings.json` (quota
-display preference), ACP logs, and `agy/` (isolated `agy` state, settings, and
-session databases).
+The state directory (`home`) isolates the bridge agent from your normal `agy`
+tools and plugins. It stores `catalog.json`, ACP logs, and `agy/` (isolated
+`agy` state, generated settings, and session databases).
 
 - **Cleanup:** Temporary session artifacts and old logs are removed
-  automatically (best-effort if locked). Current logs, `catalog.json`,
-  `settings.json`, and authentication files are retained; sessions rebuild from
-  Pi's history. Use a separate `PI_AGY_HOME` for each concurrently running Pi
-  instance because startup cleanup assumes exclusive directory ownership.
-- **OAuth sync:** With the default `PI_AGY_HOME` and file-backed auth, the
+  automatically (best-effort if locked). Current logs, `catalog.json`, and
+  authentication files are retained; sessions rebuild from Pi's history. Avoid
+  sharing a state directory between concurrent Pi processes: startup cleanup
+  assumes exclusive directory ownership.
+- **OAuth sync:** With the default state directory and file-backed auth, the
   extension atomically syncs `antigravity-oauth-token` from your normal `agy`
   directory (`ANTIGRAVITY_CLI_HOME`, `AGY_HOME`, or `~/.gemini/antigravity-cli`)
   with `0600` permissions when the isolated copy is missing, empty, or older,
   refusing symlinked paths. Sync failures warn rather than aborting startup. A
-  custom `PI_AGY_HOME` stays isolated and never copies tokens from default `agy`
+  custom `home` stays isolated and never copies tokens from default `agy`
   directories.
 - **Global quota scope:** `agy -p /usage` does not accept `--gemini-dir`, so
   quota queries always reflect the global `agy` CLI account. Do not commit or
-  share `PI_AGY_HOME`; authentication and token refresh remain `agy`'s
+  share this state directory; authentication and token refresh remain `agy`'s
   responsibility.
+
+### Native file writes
+
+Start Pi from the intended workspace and run `/agy-acp native-writes on`, then
+select an `antigravity-acp` model. The command saves `"nativeWrites": true` in
+`antigravity-acp.json` and switches the mode for the next turn without clearing Pi's conversation
+history. Run `/agy-acp native-writes` to check it or `/agy-acp native-writes off`
+to switch back. You can also edit the JSON file directly and restart Pi. Native
+writes are off by default. Other providers are unchanged. The bridge
+keeps Pi's read tools, removes Pi `edit` and `write` from Antigravity's tool
+list, and enables `replace_file_content`, `multi_replace_file_content`, and
+`write_to_file` in agy. Depending on the agy version, ACP may report these as
+`edit_file`, `write_file`, or `create_file`.
+
+Leave Pi `edit` and `write` enabled in Pi itself: their availability on each
+request determines whether the corresponding native operation may be approved.
+A read-only Pi request does not gain write access. Even without a Pi sandbox
+or permission extensions, the bridge automatically grants one-time ACP
+approvals only for identified native writes whose reported and requested
+paths agree and resolve inside the Pi launch directory. There is no prompt.
+Native agy shell is not enabled; any Pi shell tool that was already enabled
+keeps its existing permissions. This is not an OS sandbox. Native writes
+execute in agy, so they bypass Pi's `tool_call` permission extensions. Do not
+use this mode where those extensions must review writes.
+
+Finished native file operations appear in the Pi chat and are saved in the
+session. Press `Ctrl+O` to expand their diffs when agy reports one. Failed
+writes are shown without a proposed diff; very large previews are bounded.
+These entries are display-only: they do not run a Pi tool or enter model context.
+
+The mode uses a separate `native-writes` subdirectory under the configured
+state directory for agy's internal settings and session state.
 
 ## Models and context
 
@@ -211,7 +253,7 @@ prompt tokens rather than per-call prompt sizes. These numbers are estimates,
 not an invoice or a promise of free access.
 
 Read-only SQLite inspection is restricted strictly to session-scoped databases
-inside `PI_AGY_HOME` (for context windows, occupancy estimates, and hidden
+inside the state directory (for context windows, occupancy estimates, and hidden
 terminal API error detection); the extension never reads global `agy` databases
 or invokes/distributes binary patches.
 
